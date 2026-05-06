@@ -1,0 +1,8 @@
+.env
+node_modules
+dist
+build
+tmp
+vendor
+.air
+coverage.out
