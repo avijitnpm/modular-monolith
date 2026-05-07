@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/avijitnpm/modular-monolith/internal/config"
+	applogger "github.com/avijitnpm/modular-monolith/pkg/logger"
 )
 
 func main() {
@@ -14,16 +15,29 @@ func main() {
 		log.Fatal(err)
 	}
 
-	log.Printf("starting %s in %s mode",
-		cfg.App.Name,
-		cfg.App.Env,
+	logger := applogger.New(cfg)
+
+	logger.Info(
+		"application starting",
+		"app", cfg.App.Name,
+		"env", cfg.App.Env,
 	)
 
 	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("ok"))
 	})
 
-	log.Printf("server running on %s", cfg.Server.Port)
+	logger.Info(
+		"server running",
+		"port", cfg.Server.Port,
+	)
 
-	http.ListenAndServe(":"+cfg.Server.Port, nil)
+	err = http.ListenAndServe(":"+cfg.Server.Port, nil)
+
+	if err != nil {
+		logger.Error(
+			"server failed",
+			"error", err,
+		)
+	}
 }
