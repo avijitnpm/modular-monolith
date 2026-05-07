@@ -1,18 +1,19 @@
 package main
 
 import (
-	"log"
 	"net/http"
 
 	"github.com/avijitnpm/modular-monolith/internal/config"
+	"github.com/avijitnpm/modular-monolith/internal/router"
 	applogger "github.com/avijitnpm/modular-monolith/pkg/logger"
 )
 
 func main() {
+
 	cfg, err := config.Load()
 
 	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
 
 	logger := applogger.New(cfg)
@@ -23,16 +24,14 @@ func main() {
 		"env", cfg.App.Env,
 	)
 
-	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("ok"))
-	})
+	r := router.New(logger)
 
 	logger.Info(
 		"server running",
 		"port", cfg.Server.Port,
 	)
 
-	err = http.ListenAndServe(":"+cfg.Server.Port, nil)
+	err = http.ListenAndServe(":"+cfg.Server.Port, r)
 
 	if err != nil {
 		logger.Error(
