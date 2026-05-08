@@ -19,8 +19,8 @@ func registerRoutes(r chi.Router) {
 		})
 
 	})
-
 	r.Get("/panic", func(w http.ResponseWriter, r *http.Request) {
 		panic("test panic")
 	})
+
 }

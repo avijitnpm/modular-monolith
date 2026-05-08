@@ -1,42 +1,43 @@
 package main
 
 import (
-	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 
-	"github.com/avijitnpm/modular-monolith/internal/config"
-	"github.com/avijitnpm/modular-monolith/internal/router"
-	applogger "github.com/avijitnpm/modular-monolith/pkg/logger"
+	"github.com/avijitnpm/modular-monolith/internal/app"
 )
 
 func main() {
 
-	cfg, err := config.Load()
+	application, err := app.New()
 
 	if err != nil {
 		panic(err)
 	}
 
-	logger := applogger.New(cfg)
+	go func() {
+		err := application.Start()
 
-	logger.Info(
-		"application starting",
-		"app", cfg.App.Name,
-		"env", cfg.App.Env,
+		if err != nil {
+			application.Logger.Error(
+				"server failed",
+				"error", err,
+			)
+		}
+	}()
+
+	stop := make(chan os.Signal, 1)
+
+	signal.Notify(
+		stop,
+		os.Interrupt,
+		syscall.SIGTERM,
 	)
 
-	r := router.New(logger)
+	<-stop
 
-	logger.Info(
-		"server running",
-		"port", cfg.Server.Port,
-	)
+	application.Logger.Info("shutdown signal received")
 
-	err = http.ListenAndServe(":"+cfg.Server.Port, r)
-
-	if err != nil {
-		logger.Error(
-			"server failed",
-			"error", err,
-		)
-	}
+	application.Shutdown()
 }
