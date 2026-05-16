@@ -7,6 +7,7 @@ import (
 
 	appErrors "github.com/avijitnpm/modular-monolith/pkg/errors"
 
+	appcontext "github.com/avijitnpm/modular-monolith/internal/context"
 	"github.com/avijitnpm/modular-monolith/internal/service"
 	"github.com/avijitnpm/modular-monolith/pkg/response"
 )
@@ -51,6 +52,21 @@ func (h *Handler) RegisterUser(
 
 		return
 	}
+	authenticatedUser, ok := appcontext.GetAuthenticatedUser(
+		r.Context(),
+	)
+
+	if !ok {
+
+		response.InternalServerError(
+			w,
+			"authenticated user missing",
+		)
+
+		return
+	}
+
+	_ = authenticatedUser
 
 	user, err := h.Service.RegisterUser(
 		r.Context(),

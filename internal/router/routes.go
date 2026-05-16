@@ -5,6 +5,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/avijitnpm/modular-monolith/internal/auth"
 	"github.com/avijitnpm/modular-monolith/internal/modules/users"
 	"github.com/avijitnpm/modular-monolith/internal/service"
 )
@@ -22,10 +23,27 @@ func registerRoutes(
 
 	r.Route("/api/v1", func(api chi.Router) {
 
+		// PUBLIC ROUTES
+
 		api.Get("/ping", func(w http.ResponseWriter, r *http.Request) {
 			w.Write([]byte("pong"))
 		})
 
-		api.Post("/users", userHandler.RegisterUser)
+		api.Get(
+			"/token",
+			users.GenerateToken,
+		)
+
+		// PROTECTED ROUTES
+
+		api.Group(func(protected chi.Router) {
+
+			protected.Use(auth.Middleware)
+
+			protected.Post(
+				"/users",
+				userHandler.RegisterUser,
+			)
+		})
 	})
 }
