@@ -2,7 +2,10 @@ package users
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
+
+	appErrors "github.com/avijitnpm/modular-monolith/pkg/errors"
 
 	"github.com/avijitnpm/modular-monolith/internal/service"
 	"github.com/avijitnpm/modular-monolith/pkg/response"
@@ -56,10 +59,25 @@ func (h *Handler) RegisterUser(
 	)
 
 	if err != nil {
+
+		if errors.Is(
+			err,
+			appErrors.ErrUserAlreadyExists,
+		) {
+
+			response.BadRequest(
+				w,
+				"user already exists",
+			)
+
+			return
+		}
+
 		response.InternalServerError(
 			w,
 			"failed to register user",
 		)
+
 		return
 	}
 

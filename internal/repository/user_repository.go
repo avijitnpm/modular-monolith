@@ -2,6 +2,9 @@ package repository
 
 import (
 	"context"
+
+	appErrors "github.com/avijitnpm/modular-monolith/pkg/errors"
+	"github.com/jackc/pgconn"
 )
 
 func (r *Repository) CreateUser(
@@ -40,6 +43,16 @@ func (r *Repository) CreateUser(
 	)
 
 	if err != nil {
+
+		pgErr, ok := err.(*pgconn.PgError)
+
+		if ok {
+
+			if pgErr.Code == appErrors.PostgresUniqueViolation {
+				return nil, appErrors.ErrUserAlreadyExists
+			}
+		}
+
 		return nil, err
 	}
 
