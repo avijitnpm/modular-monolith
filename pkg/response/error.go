@@ -2,10 +2,14 @@ package response
 
 import (
 	"net/http"
+
+	"github.com/avijitnpm/modular-monolith/pkg/validator"
 )
 
 type ErrorResponse struct {
-	Error string `json:"error"`
+	Error string `json:"error,omitempty"`
+
+	ValidationErrors validator.ValidationErrors `json:"validation_errors,omitempty"`
 }
 
 func Error(
@@ -19,6 +23,21 @@ func Error(
 		status,
 		ErrorResponse{
 			Error: message,
+		},
+	)
+}
+
+func ValidationError(
+	w http.ResponseWriter,
+	errors validator.ValidationErrors,
+) {
+
+	JSON(
+		w,
+		http.StatusBadRequest,
+		ErrorResponse{
+			Error:            "validation failed",
+			ValidationErrors: errors,
 		},
 	)
 }

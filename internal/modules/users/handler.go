@@ -37,6 +37,17 @@ func (h *Handler) RegisterUser(
 		)
 		return
 	}
+	validationErrors := req.Validate()
+
+	if validationErrors != nil {
+
+		response.ValidationError(
+			w,
+			validationErrors,
+		)
+
+		return
+	}
 
 	user, err := h.Service.RegisterUser(
 		r.Context(),
