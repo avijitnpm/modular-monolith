@@ -4,9 +4,17 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+
+	"github.com/avijitnpm/modular-monolith/internal/modules/users"
+	"github.com/avijitnpm/modular-monolith/internal/service"
 )
 
-func registerRoutes(r chi.Router) {
+func registerRoutes(
+	r chi.Router,
+	service *service.Service,
+) {
+
+	userHandler := users.NewHandler(service)
 
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("ok"))
@@ -18,9 +26,6 @@ func registerRoutes(r chi.Router) {
 			w.Write([]byte("pong"))
 		})
 
+		api.Post("/users", userHandler.RegisterUser)
 	})
-	r.Get("/panic", func(w http.ResponseWriter, r *http.Request) {
-		panic("test panic")
-	})
-
 }

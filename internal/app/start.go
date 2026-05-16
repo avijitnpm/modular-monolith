@@ -5,8 +5,10 @@ import (
 
 	"github.com/avijitnpm/modular-monolith/internal/config"
 	"github.com/avijitnpm/modular-monolith/internal/database"
+	"github.com/avijitnpm/modular-monolith/internal/repository"
 	"github.com/avijitnpm/modular-monolith/internal/router"
-	"github.com/avijitnpm/modular-monolith/pkg/logger"
+	"github.com/avijitnpm/modular-monolith/internal/service"
+	applogger "github.com/avijitnpm/modular-monolith/pkg/logger"
 )
 
 func New() (*App, error) {
@@ -17,7 +19,7 @@ func New() (*App, error) {
 		return nil, err
 	}
 
-	log := logger.New(cfg)
+	log := applogger.New(cfg)
 
 	db, err := database.New(cfg.Database.URL)
 
@@ -25,16 +27,27 @@ func New() (*App, error) {
 		return nil, err
 	}
 
+	repo := repository.New(db)
+
+	svc := service.New(repo)
+
 	return &App{
 		Config: cfg,
 		Logger: log,
-		DB:     db,
+
+		DB: db,
+
+		Repository: repo,
+		Service:    svc,
 	}, nil
 }
 
 func (a *App) Start() error {
 
-	r := router.New(a.Logger)
+	r := router.New(
+		a.Logger,
+		a.Service,
+	)
 
 	a.Logger.Info(
 		"server starting",

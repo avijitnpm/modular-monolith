@@ -24,3 +24,9 @@ docker-up:
 
 docker-down:
 	docker compose down
+
+migrate:
+	cd migrations && tern migrate
+
+migration:
+	cd migrations && tern new $(name)

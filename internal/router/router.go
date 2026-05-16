@@ -7,16 +7,21 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/avijitnpm/modular-monolith/internal/middleware"
+	"github.com/avijitnpm/modular-monolith/internal/service"
 )
 
-func New(logger *slog.Logger) http.Handler {
+func New(
+	logger *slog.Logger,
+	service *service.Service,
+) http.Handler {
+
 	r := chi.NewRouter()
 
 	r.Use(middleware.RequestID)
 	r.Use(middleware.Logging(logger))
 	r.Use(middleware.Recovery(logger))
 
-	registerRoutes(r)
+	registerRoutes(r, service)
 
 	return r
 }
