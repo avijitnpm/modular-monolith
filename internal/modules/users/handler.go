@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/avijitnpm/modular-monolith/internal/service"
+	"github.com/avijitnpm/modular-monolith/pkg/response"
 )
 
 type Handler struct {
@@ -30,7 +31,10 @@ func (h *Handler) RegisterUser(
 	err := json.NewDecoder(r.Body).Decode(&req)
 
 	if err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+		response.BadRequest(
+			w,
+			"invalid request body",
+		)
 		return
 	}
 
@@ -41,18 +45,20 @@ func (h *Handler) RegisterUser(
 	)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		response.InternalServerError(
+			w,
+			"failed to register user",
+		)
 		return
 	}
 
-	response := UserResponse{
+	res := UserResponse{
 		ID:    user.ID,
 		Email: user.Email,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-
-	w.WriteHeader(http.StatusCreated)
-
-	json.NewEncoder(w).Encode(response)
+	response.Created(
+		w,
+		res,
+	)
 }
