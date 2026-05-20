@@ -7,6 +7,7 @@ import (
 
 	"github.com/avijitnpm/modular-monolith/internal/auth"
 	"github.com/avijitnpm/modular-monolith/internal/modules/users"
+	"github.com/avijitnpm/modular-monolith/internal/providers/identity"
 	"github.com/avijitnpm/modular-monolith/internal/service"
 )
 
@@ -38,7 +39,11 @@ func registerRoutes(
 
 		api.Group(func(protected chi.Router) {
 
-			protected.Use(auth.Middleware)
+			provider := identity.NewZitadelProvider()
+
+			protected.Use(
+				auth.Middleware(provider),
+			)
 
 			protected.Post(
 				"/users",

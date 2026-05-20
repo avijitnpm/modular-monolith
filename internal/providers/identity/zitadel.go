@@ -1,12 +1,19 @@
-package auth
+package identity
 
 import (
+	"context"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 )
 
 var jwtSecret = []byte("super-secret-development-key")
+
+type ZitadelProvider struct{}
+
+func NewZitadelProvider() *ZitadelProvider {
+	return &ZitadelProvider{}
+}
 
 func GenerateToken(
 	userID string,
@@ -34,7 +41,8 @@ func GenerateToken(
 	return token.SignedString(jwtSecret)
 }
 
-func ValidateToken(
+func (z *ZitadelProvider) ValidateToken(
+	ctx context.Context,
 	tokenString string,
 ) (*Claims, error) {
 

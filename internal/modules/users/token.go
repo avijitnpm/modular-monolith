@@ -3,7 +3,7 @@ package users
 import (
 	"net/http"
 
-	"github.com/avijitnpm/modular-monolith/internal/auth"
+	"github.com/avijitnpm/modular-monolith/internal/providers/identity"
 	"github.com/avijitnpm/modular-monolith/pkg/response"
 )
 
@@ -12,7 +12,7 @@ func GenerateToken(
 	r *http.Request,
 ) {
 
-	token, err := auth.GenerateToken(
+	token, err := identity.GenerateToken(
 		"user-123",
 		"org-456",
 		"test@example.com",
