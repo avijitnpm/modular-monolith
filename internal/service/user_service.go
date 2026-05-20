@@ -8,12 +8,14 @@ import (
 
 func (s *Service) RegisterUser(
 	ctx context.Context,
+	organizationID string,
 	zitadelUserID string,
 	email string,
 ) (*repository.User, error) {
 
 	user, err := s.Repository.CreateUser(
 		ctx,
+		organizationID,
 		zitadelUserID,
 		email,
 	)

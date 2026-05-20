@@ -15,10 +15,11 @@ func (r *Repository) CreateUser(
 
 	query := `
 		INSERT INTO users (
+		    organization_id,
 			zitadel_user_id,
 			email
 		)
-		VALUES ($1, $2)
+		VALUES ($1, $2, $3)
 		RETURNING
 			id,
 			zitadel_user_id,
@@ -32,6 +33,7 @@ func (r *Repository) CreateUser(
 	err := r.DB.QueryRow(
 		ctx,
 		query,
+		organizationID,
 		zitadelUserID,
 		email,
 	).Scan(

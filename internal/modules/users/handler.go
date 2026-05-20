@@ -67,9 +67,26 @@ func (h *Handler) RegisterUser(
 	}
 
 	_ = authenticatedUser
+	organizationID, ok := appcontext.GetOrganizationID(
+		r.Context(),
+	)
+
+	if !ok {
+
+		response.InternalServerError(
+			w,
+			"organization context missing",
+		)
+
+		return
+	}
+
+	_ = organizationID
 
 	user, err := h.Service.RegisterUser(
 		r.Context(),
+		organizationID,
+
 		req.ZitadelUserID,
 		req.Email,
 	)
