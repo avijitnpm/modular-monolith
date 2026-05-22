@@ -32,16 +32,6 @@ func (s *Service) RegisterUser(
 				return err
 			}
 
-			err = s.Repository.CreateAuditLog(
-				ctx,
-				tx,
-				"user_registered",
-			)
-
-			if err != nil {
-				return err
-			}
-
 			createdUser = user
 
 			return nil

@@ -5,6 +5,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/avijitnpm/modular-monolith/internal/audit"
 	"github.com/avijitnpm/modular-monolith/internal/auth"
 	"github.com/avijitnpm/modular-monolith/internal/middleware"
 	"github.com/avijitnpm/modular-monolith/internal/modules/users"
@@ -17,7 +18,16 @@ func registerRoutes(
 	service *service.Service,
 ) {
 
-	userHandler := users.NewHandler(service)
+	provider := identity.NewZitadelProvider()
+
+	auditService := audit.NewService(
+		service.Repository,
+	)
+
+	userHandler := users.NewHandler(
+		service,
+		auditService,
+	)
 
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("ok"))
@@ -40,10 +50,13 @@ func registerRoutes(
 
 		api.Group(func(protected chi.Router) {
 
-			provider := identity.NewZitadelProvider()
+			protected.Use(
+				auth.Middleware(provider),
+			)
 
-			protected.Use(auth.Middleware(provider))
-			protected.Use(middleware.TenantContext)
+			protected.Use(
+				middleware.TenantContext,
+			)
 
 			protected.Post(
 				"/users",

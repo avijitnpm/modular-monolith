@@ -2,27 +2,36 @@ package repository
 
 import (
 	"context"
-
-	"github.com/jackc/pgx/v5"
 )
 
 func (r *Repository) CreateAuditLog(
 	ctx context.Context,
-	tx pgx.Tx,
+	organizationID string,
+	userID string,
 	action string,
+	entityType string,
+	entityID string,
 ) error {
 
 	query := `
 		INSERT INTO audit_logs (
-			action
+			organization_id,
+			user_id,
+			action,
+			entity_type,
+			entity_id
 		)
-		VALUES ($1)
+		VALUES ($1, $2, $3, $4, $5)
 	`
 
-	_, err := tx.Exec(
+	_, err := r.DB.Exec(
 		ctx,
 		query,
+		organizationID,
+		userID,
 		action,
+		entityType,
+		entityID,
 	)
 
 	return err
