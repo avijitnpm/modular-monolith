@@ -66,12 +66,11 @@ func (h *Handler) RegisterUser(
 		return
 	}
 
-	_ = authenticatedUser
-	organizationID, ok := appcontext.GetOrganizationID(
+	organizationID, organizationOK := appcontext.GetOrganizationID(
 		r.Context(),
 	)
 
-	if !ok {
+	if !organizationOK {
 
 		response.InternalServerError(
 			w,
@@ -81,8 +80,7 @@ func (h *Handler) RegisterUser(
 		return
 	}
 
-	_ = organizationID
-
+	_ = authenticatedUser
 	user, err := h.Service.RegisterUser(
 		r.Context(),
 		organizationID,

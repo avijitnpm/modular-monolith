@@ -9,6 +9,7 @@ import (
 
 func (r *Repository) CreateUser(
 	ctx context.Context,
+	organizationID string,
 	zitadelUserID string,
 	email string,
 ) (*User, error) {
@@ -23,6 +24,7 @@ func (r *Repository) CreateUser(
 		RETURNING
 			id,
 			zitadel_user_id,
+			organization_id,
 			email,
 			created_at,
 			updated_at
@@ -39,6 +41,7 @@ func (r *Repository) CreateUser(
 	).Scan(
 		&user.ID,
 		&user.ZitadelUserID,
+		&user.OrganizationID,
 		&user.Email,
 		&user.CreatedAt,
 		&user.UpdatedAt,

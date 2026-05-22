@@ -5,6 +5,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/avijitnpm/modular-monolith/internal/auth"
 	"github.com/avijitnpm/modular-monolith/internal/middleware"
 	"github.com/avijitnpm/modular-monolith/internal/modules/users"
 	"github.com/avijitnpm/modular-monolith/internal/providers/identity"
@@ -39,8 +40,9 @@ func registerRoutes(
 
 		api.Group(func(protected chi.Router) {
 
-			_ = identity.NewZitadelProvider()
+			provider := identity.NewZitadelProvider()
 
+			protected.Use(auth.Middleware(provider))
 			protected.Use(middleware.TenantContext)
 
 			protected.Post(
