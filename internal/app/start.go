@@ -1,7 +1,10 @@
 package app
 
 import (
+	"context"
+	"errors"
 	"net/http"
+	"time"
 
 	"github.com/avijitnpm/modular-monolith/internal/config"
 	"github.com/avijitnpm/modular-monolith/internal/database"
@@ -9,6 +12,7 @@ import (
 	"github.com/avijitnpm/modular-monolith/internal/router"
 	"github.com/avijitnpm/modular-monolith/internal/service"
 	applogger "github.com/avijitnpm/modular-monolith/pkg/logger"
+	appotel "github.com/avijitnpm/modular-monolith/pkg/otel"
 )
 
 func New() (*App, error) {
@@ -21,9 +25,31 @@ func New() (*App, error) {
 
 	log := applogger.New(cfg)
 
-	db, err := database.New(cfg.Database.URL)
+	shutdownOTEL := appotel.Init(
+		context.Background(),
+		cfg,
+		log,
+	)
+
+	db, err := database.New(
+		cfg.Database.URL,
+		cfg.OTEL.Enabled,
+	)
 
 	if err != nil {
+		shutdownCtx, cancel := context.WithTimeout(
+			context.Background(),
+			5*time.Second,
+		)
+		defer cancel()
+
+		if shutdownErr := shutdownOTEL(shutdownCtx); shutdownErr != nil {
+			log.Error(
+				"otel shutdown failed after app initialization error",
+				"error", shutdownErr,
+			)
+		}
+
 		return nil, err
 	}
 
@@ -35,7 +61,8 @@ func New() (*App, error) {
 		Config: cfg,
 		Logger: log,
 
-		DB: db,
+		DB:           db,
+		ShutdownOTEL: shutdownOTEL,
 
 		Repository: repo,
 		Service:    svc,
@@ -45,17 +72,26 @@ func New() (*App, error) {
 func (a *App) Start() error {
 
 	r := router.New(
+		a.Config,
 		a.Logger,
 		a.Service,
 	)
+
+	a.HTTPServer = &http.Server{
+		Addr:    ":" + a.Config.Server.Port,
+		Handler: r,
+	}
 
 	a.Logger.Info(
 		"server starting",
 		"port", a.Config.Server.Port,
 	)
 
-	return http.ListenAndServe(
-		":"+a.Config.Server.Port,
-		r,
-	)
+	err := a.HTTPServer.ListenAndServe()
+
+	if errors.Is(err, http.ErrServerClosed) {
+		return nil
+	}
+
+	return err
 }

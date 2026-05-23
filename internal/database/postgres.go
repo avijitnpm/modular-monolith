@@ -7,7 +7,10 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func New(databaseURL string) (*pgxpool.Pool, error) {
+func New(
+	databaseURL string,
+	tracingEnabled bool,
+) (*pgxpool.Pool, error) {
 
 	ctx, cancel := context.WithTimeout(
 		context.Background(),
@@ -16,7 +19,17 @@ func New(databaseURL string) (*pgxpool.Pool, error) {
 
 	defer cancel()
 
-	db, err := pgxpool.New(ctx, databaseURL)
+	cfg, err := pgxpool.ParseConfig(databaseURL)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if tracingEnabled {
+		cfg.ConnConfig.Tracer = NewTracer()
+	}
+
+	db, err := pgxpool.NewWithConfig(ctx, cfg)
 
 	if err != nil {
 		return nil, err

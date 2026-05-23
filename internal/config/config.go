@@ -38,9 +38,15 @@ func Load() (*Config, error) {
 			WebhookSecret: k.String("DODO_WEBHOOK_SECRET"),
 		},
 		OTEL: OTELConfig{
-			Endpoint:    k.String("OTEL_ENDPOINT"),
+			Enabled:     k.Bool("OTEL_ENABLED"),
 			ServiceName: k.String("OTEL_SERVICE_NAME"),
+			Endpoint:    k.String("OTEL_EXPORTER_OTLP_ENDPOINT"),
+			Insecure:    k.Bool("OTEL_EXPORTER_OTLP_INSECURE"),
 		},
+	}
+
+	if cfg.OTEL.ServiceName == "" {
+		cfg.OTEL.ServiceName = cfg.App.Name
 	}
 
 	err = validate(cfg)

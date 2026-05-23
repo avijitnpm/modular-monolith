@@ -33,6 +33,8 @@ type PaymentConfig struct {
 }
 
 type OTELConfig struct {
-	Endpoint    string
+	Enabled     bool
 	ServiceName string
+	Endpoint    string
+	Insecure    bool
 }

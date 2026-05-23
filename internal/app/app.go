@@ -1,7 +1,9 @@
 package app
 
 import (
+	"context"
 	"log/slog"
+	"net/http"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -14,7 +16,9 @@ type App struct {
 	Config *config.Config
 	Logger *slog.Logger
 
-	DB *pgxpool.Pool
+	HTTPServer   *http.Server
+	DB           *pgxpool.Pool
+	ShutdownOTEL func(context.Context) error
 
 	Repository *repository.Repository
 	Service    *service.Service

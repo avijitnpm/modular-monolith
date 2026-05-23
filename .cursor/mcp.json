@@ -1,0 +1,29 @@
+{
+  "mcpServers": {
+    "filesystem": {
+      "command": "/home/ron/.config/nvm/versions/node/v20.19.6/bin/npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "${workspaceFolder}"
+      ]
+    },
+    "postgres": {
+      "command": "/home/ron/.config/nvm/versions/node/v20.19.6/bin/npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-postgres",
+        "postgresql://postgres:postgres@localhost:5432/app_db?sslmode=disable"
+      ]
+    },
+    "git": {
+      "command": "/home/ron/.cursor/mcp-venvs/git/bin/python3",
+      "args": [
+        "-m",
+        "mcp_server_git",
+        "--repository",
+        "${workspaceFolder}"
+      ]
+    }
+  }
+}
