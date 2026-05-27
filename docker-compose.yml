@@ -1,0 +1,112 @@
+name: modular-monolith
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: modular-monolith-app:local
+    restart: unless-stopped
+    environment:
+      APP_NAME: ${APP_NAME:-modular-monolith}
+      APP_ENV: ${APP_ENV:-development}
+      SERVER_PORT: ${SERVER_PORT:-8080}
+      DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-app_db}?sslmode=disable
+      ZITADEL_ISSUER: ${ZITADEL_ISSUER:-http://localhost:8081}
+      ZITADEL_API_URL: ${ZITADEL_API_URL:-http://localhost:8081}
+      DODO_API_KEY: ${DODO_API_KEY:-dev_key}
+      DODO_WEBHOOK_SECRET: ${DODO_WEBHOOK_SECRET:-dev_secret}
+      OTEL_ENABLED: ${OTEL_ENABLED:-true}
+      OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-modular-monolith}
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://openobserve:5080/api/default/v1/traces
+      OTEL_EXPORTER_OTLP_INSECURE: ${OTEL_EXPORTER_OTLP_INSECURE:-true}
+      OTEL_EXPORTER_OTLP_HEADERS: ${OTEL_EXPORTER_OTLP_HEADERS:-Authorization=Basic YWRtaW5AZXhhbXBsZS5jb206U3Ryb25nUGFzc3dvcmQxMjM=}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      openobserve:
+        condition: service_started
+    networks:
+      - monolith_internal
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:${SERVER_PORT:-8080}/health >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.modular-monolith-root.rule: Host(`localhost`)
+      traefik.http.routers.modular-monolith-root.entrypoints: web
+      traefik.http.routers.modular-monolith-root.priority: "1"
+      traefik.http.routers.modular-monolith-root.service: modular-monolith
+      traefik.http.routers.modular-monolith-api.rule: Host(`localhost`) && PathPrefix(`/api`)
+      traefik.http.routers.modular-monolith-api.entrypoints: web
+      traefik.http.routers.modular-monolith-api.priority: "10"
+      traefik.http.routers.modular-monolith-api.service: modular-monolith
+      traefik.http.services.modular-monolith.loadbalancer.server.port: "${SERVER_PORT:-8080}"
+
+  postgres:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-app_db}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - monolith_internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-app_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  openobserve:
+    image: openobserve/openobserve:latest
+    restart: unless-stopped
+    environment:
+      ZO_ROOT_USER_EMAIL: ${ZO_ROOT_USER_EMAIL:-admin@example.com}
+      ZO_ROOT_USER_PASSWORD: ${ZO_ROOT_USER_PASSWORD:-StrongPassword123}
+      ZO_DATA_DIR: /data
+    ports:
+      - "127.0.0.1:${OPENOBSERVE_PORT:-5080}:5080"
+    volumes:
+      - openobserve_data:/data
+    networks:
+      - monolith_internal
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:5080/healthz >/dev/null || wget -qO- http://127.0.0.1:5080/healthz >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  traefik:
+    image: traefik:v3.0
+    restart: unless-stopped
+    command:
+      - --configFile=/etc/traefik/traefik.yml
+    ports:
+      - "${TRAEFIK_HTTP_PORT:-80}:80"
+      - "127.0.0.1:${TRAEFIK_DASHBOARD_PORT:-8081}:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./deployments/traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+    depends_on:
+      app:
+        condition: service_started
+    networks:
+      - monolith_internal
+
+networks:
+  monolith_internal:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  openobserve_data:
