@@ -1,8 +1,25 @@
-import { clsx, type ClassValue } from "clsx";
-import { twMerge } from "tailwind-merge";
+type ClassValue = string | number | boolean | null | undefined | ClassValue[] | Record<string, boolean>;
 
 export function cn(...inputs: ClassValue[]) {
-	return twMerge(clsx(inputs));
+	return inputs.flatMap(classNames).filter(Boolean).join(" ");
+}
+
+function classNames(input: ClassValue): string[] {
+	if (!input) {
+		return [];
+	}
+
+	if (Array.isArray(input)) {
+		return input.flatMap(classNames);
+	}
+
+	if (typeof input === "object") {
+		return Object.entries(input)
+			.filter(([, enabled]) => enabled)
+			.map(([name]) => name);
+	}
+
+	return [String(input)];
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -3,7 +3,9 @@ package router
 import (
 	"log/slog"
 	"net/http"
+	"strings"
 
+	"github.com/avijitnpm/modular-monolith/frontend"
 	"github.com/avijitnpm/modular-monolith/internal/config"
 	"github.com/avijitnpm/modular-monolith/internal/middleware"
 	"github.com/avijitnpm/modular-monolith/internal/service"
@@ -39,7 +41,35 @@ func New(
 	r.Use(middleware.Logging(logger))
 	r.Use(middleware.Recovery(logger))
 
-	registerRoutes(r, service)
+	registerRoutes(
+		r,
+		cfg,
+		logger,
+		service,
+	)
+
+	frontendHandler := frontend.Handler()
+
+	r.NotFound(func(
+		w http.ResponseWriter,
+		req *http.Request,
+	) {
+		if strings.HasPrefix(
+			req.URL.Path,
+			"/api/",
+		) {
+			http.NotFound(
+				w,
+				req,
+			)
+			return
+		}
+
+		frontendHandler.ServeHTTP(
+			w,
+			req,
+		)
+	})
 
 	return r
 }

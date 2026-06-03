@@ -23,8 +23,13 @@ type DatabaseConfig struct {
 }
 
 type AuthConfig struct {
-	ZitadelIssuer string
-	ZitadelAPIURL string
+	ZitadelIssuer   string
+	ZitadelAPIURL   string
+	OIDCIssuer      string
+	OIDCAudience    string
+	OIDCClientID    string
+	OIDCRedirectURL string
+	SessionSecret   string
 }
 
 type PaymentConfig struct {

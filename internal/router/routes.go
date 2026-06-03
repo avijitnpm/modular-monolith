@@ -1,13 +1,16 @@
 package router
 
 import (
+	"log/slog"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
 
 	"github.com/avijitnpm/modular-monolith/internal/audit"
 	"github.com/avijitnpm/modular-monolith/internal/auth"
+	"github.com/avijitnpm/modular-monolith/internal/config"
 	"github.com/avijitnpm/modular-monolith/internal/middleware"
+	"github.com/avijitnpm/modular-monolith/internal/modules/authflow"
 	"github.com/avijitnpm/modular-monolith/internal/modules/users"
 	"github.com/avijitnpm/modular-monolith/internal/providers/identity"
 	"github.com/avijitnpm/modular-monolith/internal/service"
@@ -15,10 +18,46 @@ import (
 
 func registerRoutes(
 	r chi.Router,
+	cfg *config.Config,
+	logger *slog.Logger,
 	service *service.Service,
 ) {
 
-	provider := identity.NewZitadelProvider()
+	apiTokenProvider := identity.NewZitadelProvider(
+		identity.OIDCConfig{
+			Issuer:   cfg.Auth.OIDCIssuer,
+			Audience: cfg.Auth.OIDCAudience,
+		},
+	)
+
+	oauthProvider := identity.NewZitadelProvider(
+		identity.OIDCConfig{
+			Issuer:      cfg.Auth.OIDCIssuer,
+			Audience:    cfg.Auth.OIDCAudience,
+			ClientID:    cfg.Auth.OIDCClientID,
+			RedirectURL: cfg.Auth.OIDCRedirectURL,
+		},
+	)
+
+	idTokenProvider := identity.NewZitadelProvider(
+		identity.OIDCConfig{
+			Issuer:   cfg.Auth.OIDCIssuer,
+			Audience: cfg.Auth.OIDCClientID,
+		},
+	)
+
+	authHandler, err := authflow.NewHandler(
+		oauthProvider,
+		idTokenProvider,
+		cfg.Auth.SessionSecret,
+		cfg.App.Env != "development",
+		logger,
+		cfg.App.Env == "development",
+	)
+
+	if err != nil {
+		panic(err)
+	}
 
 	auditService := audit.NewService(
 		service.Repository,
@@ -46,12 +85,32 @@ func registerRoutes(
 			users.GenerateToken,
 		)
 
+		api.Get(
+			"/auth/login",
+			authHandler.Login,
+		)
+
+		api.Get(
+			"/auth/callback",
+			authHandler.Callback,
+		)
+
+		api.Post(
+			"/auth/logout",
+			authHandler.Logout,
+		)
+
+		api.Get(
+			"/auth/me",
+			authHandler.Me,
+		)
+
 		// PROTECTED ROUTES
 
 		api.Group(func(protected chi.Router) {
 
 			protected.Use(
-				auth.Middleware(provider),
+				auth.Middleware(apiTokenProvider),
 			)
 
 			protected.Use(
