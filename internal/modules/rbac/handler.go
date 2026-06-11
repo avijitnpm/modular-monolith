@@ -16,6 +16,10 @@ type Handler struct {
 	Service *Service
 }
 
+type BootstrapRBACRequest struct {
+	OrganizationID string `json:"organization_id"`
+}
+
 func NewHandler(
 	service *Service,
 ) *Handler {
@@ -23,6 +27,62 @@ func NewHandler(
 	return &Handler{
 		Service: service,
 	}
+}
+
+func (h *Handler) BootstrapRBAC(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
+
+	var req BootstrapRBACRequest
+
+	err := json.NewDecoder(r.Body).Decode(
+		&req,
+	)
+
+	if err != nil {
+		response.BadRequest(
+			w,
+			"invalid request body",
+		)
+
+		return
+	}
+
+	req.OrganizationID = strings.TrimSpace(
+		req.OrganizationID,
+	)
+
+	if req.OrganizationID == "" {
+		response.BadRequest(
+			w,
+			"organization id is required",
+		)
+
+		return
+	}
+
+	err = h.Service.BootstrapDefaultRoles(
+		r.Context(),
+		req.OrganizationID,
+	)
+
+	if err != nil {
+		response.InternalServerError(
+			w,
+			"failed to bootstrap RBAC",
+		)
+
+		return
+	}
+
+	response.OK(
+		w,
+		map[string]any{
+			"organization_id": req.OrganizationID,
+			"bootstrapped":    true,
+		},
+	)
 }
 
 func (h *Handler) ListRoles(

@@ -130,6 +130,12 @@ func registerRoutes(
 			organizationHandler.CreateOrganization,
 		)
 
+		// TEMPORARY RBAC VERIFICATION ENDPOINT
+		api.Post(
+			"/admin/bootstrap-rbac",
+			rbacHandler.BootstrapRBAC,
+		)
+
 		// PROTECTED ROUTES
 
 		api.Group(func(protected chi.Router) {

@@ -236,10 +236,12 @@ func assertAuditEvent(
 }
 
 type fakeStore struct {
-	createRole            *Role
-	createRoleErr         error
-	createRoleName        string
-	createRolePermissions []string
+	createRole              *Role
+	createRoleErr           error
+	createRoleName          string
+	createRolePermissions   []string
+	bootstrapOrganizationID string
+	bootstrapErr            error
 
 	assignRole    *UserRole
 	assignRoleErr error
@@ -281,11 +283,13 @@ func (f *fakeStore) CreateRole(
 }
 
 func (f *fakeStore) BootstrapDefaultRoles(
-	context.Context,
-	string,
+	_ context.Context,
+	organizationID string,
 ) error {
 
-	return nil
+	f.bootstrapOrganizationID = organizationID
+
+	return f.bootstrapErr
 }
 
 func (f *fakeStore) AssignRoleToUser(
