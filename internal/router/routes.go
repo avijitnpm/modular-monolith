@@ -11,6 +11,8 @@ import (
 	"github.com/avijitnpm/modular-monolith/internal/config"
 	"github.com/avijitnpm/modular-monolith/internal/middleware"
 	"github.com/avijitnpm/modular-monolith/internal/modules/authflow"
+	"github.com/avijitnpm/modular-monolith/internal/modules/organizations"
+	"github.com/avijitnpm/modular-monolith/internal/modules/rbac"
 	"github.com/avijitnpm/modular-monolith/internal/modules/users"
 	"github.com/avijitnpm/modular-monolith/internal/providers/identity"
 	"github.com/avijitnpm/modular-monolith/internal/service"
@@ -49,6 +51,7 @@ func registerRoutes(
 	authHandler, err := authflow.NewHandler(
 		oauthProvider,
 		idTokenProvider,
+		service,
 		cfg.Auth.SessionSecret,
 		cfg.App.Env != "development",
 		logger,
@@ -66,6 +69,23 @@ func registerRoutes(
 	userHandler := users.NewHandler(
 		service,
 		auditService,
+	)
+
+	organizationHandler := organizations.NewHandler(
+		service,
+	)
+
+	rbacRepository := rbac.NewRepository(
+		service.Repository.DB,
+	)
+
+	rbacService := rbac.NewService(
+		rbacRepository,
+		auditService,
+	)
+
+	rbacHandler := rbac.NewHandler(
+		rbacService,
 	)
 
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -105,6 +125,11 @@ func registerRoutes(
 			authHandler.Me,
 		)
 
+		api.Post(
+			"/organizations",
+			organizationHandler.CreateOrganization,
+		)
+
 		// PROTECTED ROUTES
 
 		api.Group(func(protected chi.Router) {
@@ -120,6 +145,36 @@ func registerRoutes(
 			protected.Post(
 				"/users",
 				userHandler.RegisterUser,
+			)
+
+			protected.Get(
+				"/roles",
+				rbacHandler.ListRoles,
+			)
+
+			protected.With(
+				rbac.RequirePermission(
+					rbacService,
+					"settings.write",
+				),
+			).Post(
+				"/roles",
+				rbacHandler.CreateRole,
+			)
+
+			protected.Get(
+				"/permissions",
+				rbacHandler.ListPermissions,
+			)
+
+			protected.With(
+				rbac.RequirePermission(
+					rbacService,
+					"settings.write",
+				),
+			).Post(
+				"/users/{id}/roles",
+				rbacHandler.AssignRoleToUser,
 			)
 		})
 	})

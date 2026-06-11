@@ -3,7 +3,9 @@ package service
 import (
 	"context"
 
+	"github.com/avijitnpm/modular-monolith/internal/modules/rbac"
 	"github.com/avijitnpm/modular-monolith/internal/repository"
+	"github.com/jackc/pgx/v5"
 )
 
 func (s *Service) RegisterOrganization(
@@ -12,15 +14,41 @@ func (s *Service) RegisterOrganization(
 	name string,
 ) (*repository.Organization, error) {
 
-	org, err := s.Repository.CreateOrganization(
+	var createdOrganization *repository.Organization
+
+	err := s.WithTransaction(
 		ctx,
-		zitadelOrgID,
-		name,
+		func(tx pgx.Tx) error {
+			org, err := s.Repository.CreateOrganizationTx(
+				ctx,
+				tx,
+				zitadelOrgID,
+				name,
+			)
+
+			if err != nil {
+				return err
+			}
+
+			err = rbac.BootstrapDefaultRolesTx(
+				ctx,
+				tx,
+				org.OrganizationID,
+			)
+
+			if err != nil {
+				return err
+			}
+
+			createdOrganization = org
+
+			return nil
+		},
 	)
 
 	if err != nil {
 		return nil, err
 	}
 
-	return org, nil
+	return createdOrganization, nil
 }

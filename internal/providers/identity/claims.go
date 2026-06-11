@@ -72,5 +72,9 @@ func (c *Claims) UnmarshalJSON(data []byte) error {
 	c.RegisteredClaims = parsed.RegisteredClaims
 	c.RawClaims = raw
 
+	if c.UserID == "" {
+		c.UserID = c.Subject
+	}
+
 	return nil
 }

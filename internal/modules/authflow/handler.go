@@ -34,13 +34,23 @@ type OAuthProvider interface {
 	) (*identity.TokenResponse, error)
 }
 
+type UserProvisioner interface {
+	ProvisionAuthenticatedUser(
+		ctx context.Context,
+		zitadelUserID string,
+		email string,
+		organizationID string,
+	) error
+}
+
 type Handler struct {
-	oauth          OAuthProvider
-	tokenValidator identity.Provider
-	sessions       *sessionManager
-	logger         *slog.Logger
-	secureCookies  bool
-	logClaimKeys   bool
+	oauth           OAuthProvider
+	tokenValidator  identity.Provider
+	userProvisioner UserProvisioner
+	sessions        *sessionManager
+	logger          *slog.Logger
+	secureCookies   bool
+	logClaimKeys    bool
 }
 
 var discoveredClaimKeysOnce sync.Once
@@ -48,6 +58,7 @@ var discoveredClaimKeysOnce sync.Once
 func NewHandler(
 	oauth OAuthProvider,
 	tokenValidator identity.Provider,
+	userProvisioner UserProvisioner,
 	sessionSecret string,
 	secureCookies bool,
 	logger *slog.Logger,
@@ -63,12 +74,13 @@ func NewHandler(
 	}
 
 	return &Handler{
-		oauth:          oauth,
-		tokenValidator: tokenValidator,
-		sessions:       sessions,
-		logger:         logger,
-		secureCookies:  secureCookies,
-		logClaimKeys:   logClaimKeys,
+		oauth:           oauth,
+		tokenValidator:  tokenValidator,
+		userProvisioner: userProvisioner,
+		sessions:        sessions,
+		logger:          logger,
+		secureCookies:   secureCookies,
+		logClaimKeys:    logClaimKeys,
 	}, nil
 }
 
@@ -250,6 +262,26 @@ func (h *Handler) Callback(
 
 	h.logDiscoveredClaimKeys(claims.RawClaims)
 
+	user := normalizeUser(claims)
+
+	if h.userProvisioner != nil {
+		err = h.userProvisioner.ProvisionAuthenticatedUser(
+			r.Context(),
+			user.Subject,
+			user.Email,
+			user.OrganizationID,
+		)
+
+		if err != nil {
+			response.InternalServerError(
+				w,
+				"failed to provision user",
+			)
+
+			return
+		}
+	}
+
 	expiresAt := time.Now().Add(sessionTTL)
 
 	if claims.ExpiresAt != nil {
@@ -259,7 +291,7 @@ func (h *Handler) Callback(
 	err = h.sessions.set(
 		w,
 		Session{
-			User:      normalizeUser(claims),
+			User:      user,
 			ExpiresAt: expiresAt.Unix(),
 		},
 	)

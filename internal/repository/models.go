@@ -16,8 +16,9 @@ type User struct {
 type Organization struct {
 	ID string
 
-	ZitadelOrgID string
-	Name         string
+	ZitadelOrgID   string
+	OrganizationID string
+	Name           string
 
 	CreatedAt time.Time
 }

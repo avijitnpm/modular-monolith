@@ -2,7 +2,13 @@ package repository
 
 import (
 	"context"
+
+	"github.com/jackc/pgx/v5"
 )
+
+type organizationQueryer interface {
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+}
 
 func (r *Repository) CreateOrganization(
 	ctx context.Context,
@@ -10,22 +16,39 @@ func (r *Repository) CreateOrganization(
 	name string,
 ) (*Organization, error) {
 
+	return r.CreateOrganizationTx(
+		ctx,
+		r.DB,
+		zitadelOrgID,
+		name,
+	)
+}
+
+func (r *Repository) CreateOrganizationTx(
+	ctx context.Context,
+	q organizationQueryer,
+	zitadelOrgID string,
+	name string,
+) (*Organization, error) {
+
 	query := `
 		INSERT INTO organizations (
 			zitadel_org_id,
+			organization_id,
 			name
 		)
-		VALUES ($1, $2)
+		VALUES ($1, $1, $2)
 		RETURNING
 			id,
 			zitadel_org_id,
+			organization_id,
 			name,
 			created_at
 	`
 
 	org := &Organization{}
 
-	err := r.DB.QueryRow(
+	err := q.QueryRow(
 		ctx,
 		query,
 		zitadelOrgID,
@@ -33,6 +56,7 @@ func (r *Repository) CreateOrganization(
 	).Scan(
 		&org.ID,
 		&org.ZitadelOrgID,
+		&org.OrganizationID,
 		&org.Name,
 		&org.CreatedAt,
 	)

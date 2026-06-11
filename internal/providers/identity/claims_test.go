@@ -34,6 +34,10 @@ func TestClaimsUnmarshalCapturesTypedAndRawClaims(t *testing.T) {
 		t.Fatalf("expected subject, got %q", claims.Subject)
 	}
 
+	if claims.UserID != "user-123" {
+		t.Fatalf("expected user id fallback from subject, got %q", claims.UserID)
+	}
+
 	if claims.Email != "test@example.com" {
 		t.Fatalf("expected email, got %q", claims.Email)
 	}

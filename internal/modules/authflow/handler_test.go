@@ -2,6 +2,7 @@ package authflow
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -201,6 +202,170 @@ func TestCallbackCreatesSessionAndMeReturnsUser(t *testing.T) {
 	}
 }
 
+func TestCallbackProvisionsAuthenticatedUser(t *testing.T) {
+	oauth := &mockOAuthProvider{
+		token: &identity.TokenResponse{
+			IDToken: "id-token",
+		},
+	}
+	validator := &mockTokenValidator{
+		claims: &identity.Claims{
+			UserID:         "user-123",
+			Email:          "test@example.com",
+			OrganizationID: "org-123",
+			Nonce:          "nonce",
+			RegisteredClaims: jwt.RegisteredClaims{
+				ExpiresAt: jwt.NewNumericDate(
+					time.Now().Add(time.Hour),
+				),
+			},
+		},
+	}
+	provisioner := &mockUserProvisioner{}
+	handler := newTestHandlerWithProvisioner(
+		t,
+		oauth,
+		validator,
+		provisioner,
+	)
+
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/api/v1/auth/callback?code=abc&state=stored",
+		nil,
+	)
+	req.AddCookie(testCookie(stateCookieName, "stored"))
+	req.AddCookie(testCookie(nonceCookieName, "nonce"))
+	req.AddCookie(testCookie(codeVerifierCookieName, "verifier"))
+
+	rec := httptest.NewRecorder()
+
+	handler.Callback(
+		rec,
+		req,
+	)
+
+	if rec.Code != http.StatusFound {
+		t.Fatalf("expected redirect, got %d", rec.Code)
+	}
+
+	if provisioner.zitadelUserID != "user-123" {
+		t.Fatalf("expected provisioned user id, got %q", provisioner.zitadelUserID)
+	}
+
+	if provisioner.email != "test@example.com" {
+		t.Fatalf("expected provisioned email, got %q", provisioner.email)
+	}
+
+	if provisioner.organizationID != "org-123" {
+		t.Fatalf("expected provisioned organization, got %q", provisioner.organizationID)
+	}
+}
+
+func TestCallbackPassesEmptyEmailToProvisioner(t *testing.T) {
+	oauth := &mockOAuthProvider{
+		token: &identity.TokenResponse{
+			IDToken: "id-token",
+		},
+	}
+	validator := &mockTokenValidator{
+		claims: &identity.Claims{
+			UserID:         "user-123",
+			OrganizationID: "org-123",
+			Nonce:          "nonce",
+			RegisteredClaims: jwt.RegisteredClaims{
+				ExpiresAt: jwt.NewNumericDate(
+					time.Now().Add(time.Hour),
+				),
+			},
+		},
+	}
+	provisioner := &mockUserProvisioner{}
+	handler := newTestHandlerWithProvisioner(
+		t,
+		oauth,
+		validator,
+		provisioner,
+	)
+
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/api/v1/auth/callback?code=abc&state=stored",
+		nil,
+	)
+	req.AddCookie(testCookie(stateCookieName, "stored"))
+	req.AddCookie(testCookie(nonceCookieName, "nonce"))
+	req.AddCookie(testCookie(codeVerifierCookieName, "verifier"))
+
+	rec := httptest.NewRecorder()
+
+	handler.Callback(
+		rec,
+		req,
+	)
+
+	if rec.Code != http.StatusFound {
+		t.Fatalf("expected redirect, got %d", rec.Code)
+	}
+
+	if provisioner.email != "" {
+		t.Fatalf("expected empty email to be passed through, got %q", provisioner.email)
+	}
+}
+
+func TestCallbackRejectsProvisioningError(t *testing.T) {
+	oauth := &mockOAuthProvider{
+		token: &identity.TokenResponse{
+			IDToken: "id-token",
+		},
+	}
+	validator := &mockTokenValidator{
+		claims: &identity.Claims{
+			UserID: "user-123",
+			Nonce:  "nonce",
+			RegisteredClaims: jwt.RegisteredClaims{
+				ExpiresAt: jwt.NewNumericDate(
+					time.Now().Add(time.Hour),
+				),
+			},
+		},
+	}
+	handler := newTestHandlerWithProvisioner(
+		t,
+		oauth,
+		validator,
+		&mockUserProvisioner{
+			err: errors.New("provision failed"),
+		},
+	)
+
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/api/v1/auth/callback?code=abc&state=stored",
+		nil,
+	)
+	req.AddCookie(testCookie(stateCookieName, "stored"))
+	req.AddCookie(testCookie(nonceCookieName, "nonce"))
+	req.AddCookie(testCookie(codeVerifierCookieName, "verifier"))
+
+	rec := httptest.NewRecorder()
+
+	handler.Callback(
+		rec,
+		req,
+	)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("expected internal server error, got %d", rec.Code)
+	}
+
+	for _, cookie := range rec.Result().Cookies() {
+		if cookie.Name == sessionCookieName {
+			t.Fatal("expected no session cookie when provisioning fails")
+		}
+	}
+}
+
 func TestCallbackRejectsNonceMismatch(t *testing.T) {
 	handler := newTestHandler(
 		t,
@@ -308,9 +473,26 @@ func newTestHandler(
 ) *Handler {
 	t.Helper()
 
+	return newTestHandlerWithProvisioner(
+		t,
+		oauth,
+		validator,
+		nil,
+	)
+}
+
+func newTestHandlerWithProvisioner(
+	t *testing.T,
+	oauth OAuthProvider,
+	validator identity.Provider,
+	provisioner UserProvisioner,
+) *Handler {
+	t.Helper()
+
 	handler, err := NewHandler(
 		oauth,
 		validator,
+		provisioner,
 		"01234567890123456789012345678901",
 		false,
 		nil,
@@ -396,4 +578,25 @@ func (m *mockTokenValidator) ValidateToken(
 	token string,
 ) (*identity.Claims, error) {
 	return m.claims, nil
+}
+
+type mockUserProvisioner struct {
+	zitadelUserID  string
+	email          string
+	organizationID string
+	err            error
+}
+
+func (m *mockUserProvisioner) ProvisionAuthenticatedUser(
+	ctx context.Context,
+	zitadelUserID string,
+	email string,
+	organizationID string,
+) error {
+
+	m.zitadelUserID = zitadelUserID
+	m.email = email
+	m.organizationID = organizationID
+
+	return m.err
 }
