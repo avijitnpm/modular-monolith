@@ -3,6 +3,7 @@ package router
 import (
 	"log/slog"
 	"net/http"
+	"os"
 
 	"github.com/go-chi/chi/v5"
 
@@ -11,9 +12,11 @@ import (
 	"github.com/avijitnpm/modular-monolith/internal/config"
 	"github.com/avijitnpm/modular-monolith/internal/middleware"
 	"github.com/avijitnpm/modular-monolith/internal/modules/authflow"
+	"github.com/avijitnpm/modular-monolith/internal/modules/billing"
 	"github.com/avijitnpm/modular-monolith/internal/modules/organizations"
 	"github.com/avijitnpm/modular-monolith/internal/modules/rbac"
 	"github.com/avijitnpm/modular-monolith/internal/modules/users"
+	"github.com/avijitnpm/modular-monolith/internal/platform/payments/dodo"
 	"github.com/avijitnpm/modular-monolith/internal/providers/identity"
 	"github.com/avijitnpm/modular-monolith/internal/service"
 )
@@ -86,6 +89,23 @@ func registerRoutes(
 
 	rbacHandler := rbac.NewHandler(
 		rbacService,
+	)
+
+	billingRepository := billing.NewRepository(
+		service.Repository.DB,
+	)
+
+	billingProvider := dodo.NewProvider(
+		os.Getenv("DODO_API_KEY"),
+	)
+
+	billingService := billing.NewService(
+		billingRepository,
+		billingProvider,
+	)
+
+	billingHandler := billing.NewHandler(
+		billingService,
 	)
 
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -171,6 +191,46 @@ func registerRoutes(
 			protected.Get(
 				"/permissions",
 				rbacHandler.ListPermissions,
+			)
+
+			protected.With(
+				rbac.RequirePermission(
+					rbacService,
+					"billing.read",
+				),
+			).Get(
+				"/billing",
+				billingHandler.GetBilling,
+			)
+
+			protected.With(
+				rbac.RequirePermission(
+					rbacService,
+					"billing.write",
+				),
+			).Post(
+				"/billing",
+				billingHandler.CreateBilling,
+			)
+
+			protected.With(
+				rbac.RequirePermission(
+					rbacService,
+					"billing.write",
+				),
+			).Post(
+				"/billing/checkout",
+				billingHandler.CreateCheckout,
+			)
+
+			protected.With(
+				rbac.RequirePermission(
+					rbacService,
+					"billing.write",
+				),
+			).Patch(
+				"/billing/{id}",
+				billingHandler.UpdateBilling,
 			)
 
 			protected.With(
