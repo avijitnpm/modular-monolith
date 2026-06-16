@@ -203,6 +203,51 @@ func (r *Repository) UpdateSubscription(
 	return &subscription, nil
 }
 
+func (r *Repository) UpsertSubscriptionByProvider(
+	ctx context.Context,
+	organizationID string,
+	provider string,
+	providerSubscriptionID string,
+	providerCustomerID string,
+	plan string,
+	status string,
+	currentPeriodEnd *time.Time,
+) error {
+
+	_, err := r.DB.Exec(
+		ctx,
+		`
+			INSERT INTO subscriptions (
+				organization_id,
+				provider,
+				provider_subscription_id,
+				provider_customer_id,
+				plan,
+				status,
+				current_period_end
+			)
+			VALUES ($1, $2, $3, $4, $5, $6, $7)
+			ON CONFLICT (organization_id)
+			DO UPDATE SET
+				provider_subscription_id = EXCLUDED.provider_subscription_id,
+				provider_customer_id = EXCLUDED.provider_customer_id,
+				plan = EXCLUDED.plan,
+				status = EXCLUDED.status,
+				current_period_end = EXCLUDED.current_period_end,
+				updated_at = now()
+		`,
+		organizationID,
+		provider,
+		providerSubscriptionID,
+		providerCustomerID,
+		plan,
+		status,
+		currentPeriodEnd,
+	)
+
+	return err
+}
+
 func isUniqueViolation(
 	err error,
 ) bool {

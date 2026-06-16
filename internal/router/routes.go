@@ -3,7 +3,6 @@ package router
 import (
 	"log/slog"
 	"net/http"
-	"os"
 
 	"github.com/go-chi/chi/v5"
 
@@ -96,7 +95,8 @@ func registerRoutes(
 	)
 
 	billingProvider := dodo.NewProvider(
-		os.Getenv("DODO_API_KEY"),
+		cfg.Payments.DodoAPIKey,
+		cfg.Payments.WebhookSecret,
 	)
 
 	billingService := billing.NewService(
@@ -106,6 +106,11 @@ func registerRoutes(
 
 	billingHandler := billing.NewHandler(
 		billingService,
+	)
+
+	webhookHandler := billing.NewWebhookHandler(
+		billingService,
+		billingProvider,
 	)
 
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -154,6 +159,11 @@ func registerRoutes(
 		api.Post(
 			"/admin/bootstrap-rbac",
 			rbacHandler.BootstrapRBAC,
+		)
+
+		api.Post(
+			"/billing/webhook",
+			webhookHandler.HandleWebhook,
 		)
 
 		// PROTECTED ROUTES

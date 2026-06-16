@@ -29,6 +29,16 @@ type Store interface {
 		status string,
 		currentPeriodEnd *time.Time,
 	) (*Subscription, error)
+	UpsertSubscriptionByProvider(
+		ctx context.Context,
+		organizationID string,
+		provider string,
+		providerSubscriptionID string,
+		providerCustomerID string,
+		plan string,
+		status string,
+		currentPeriodEnd *time.Time,
+	) error
 }
 
 type Service struct {
@@ -131,5 +141,41 @@ func (s *Service) UpdateSubscription(
 		plan,
 		status,
 		currentPeriodEnd,
+	)
+}
+
+func (s *Service) ProcessWebhookEvent(
+	ctx context.Context,
+	event *payments.WebhookEvent,
+) error {
+
+	if event == nil || event.OrganizationID == "" || event.Status == "" {
+		return ErrInvalidSubscription
+	}
+
+	existing, err := s.Repository.GetSubscription(ctx, event.OrganizationID)
+	if err != nil {
+		return err
+	}
+
+	if existing != nil {
+		if existing.Status == event.Status {
+			return nil
+		}
+
+		if err := ValidateTransition(existing.Status, event.Status); err != nil {
+			return err
+		}
+	}
+
+	return s.Repository.UpsertSubscriptionByProvider(
+		ctx,
+		event.OrganizationID,
+		"dodo",
+		event.ProviderSubscriptionID,
+		event.ProviderCustomerID,
+		event.Plan,
+		event.Status,
+		event.CurrentPeriodEnd,
 	)
 }

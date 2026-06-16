@@ -3,19 +3,25 @@ package dodo
 import (
 	"bytes"
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/avijitnpm/modular-monolith/internal/platform/payments"
 )
 
 const defaultBaseURL = "https://test.dodopayments.com"
 
 type Provider struct {
-	APIKey     string
-	BaseURL    string
-	HTTPClient *http.Client
+	APIKey        string
+	WebhookSecret string
+	BaseURL       string
+	HTTPClient    *http.Client
 }
 
 type checkoutRequest struct {
@@ -32,13 +38,27 @@ type checkoutResponse struct {
 	CheckoutURL string `json:"checkout_url"`
 }
 
+type webhookPayload struct {
+	Type string `json:"type"`
+	Data struct {
+		SubscriptionID string            `json:"subscription_id"`
+		CustomerID     string            `json:"customer_id"`
+		ProductID      string            `json:"product_id"`
+		Status         string            `json:"status"`
+		CurrentPeriodEnd *time.Time      `json:"current_period_end"`
+		Metadata       map[string]string `json:"metadata"`
+	} `json:"data"`
+}
+
 func NewProvider(
 	apiKey string,
+	webhookSecret string,
 ) *Provider {
 
 	return &Provider{
-		APIKey:  strings.TrimSpace(apiKey),
-		BaseURL: defaultBaseURL,
+		APIKey:        strings.TrimSpace(apiKey),
+		WebhookSecret: strings.TrimSpace(webhookSecret),
+		BaseURL:       defaultBaseURL,
 		HTTPClient: &http.Client{
 			Timeout: 10 * time.Second,
 		},
@@ -110,4 +130,38 @@ func (p *Provider) CreateCheckoutSession(
 	}
 
 	return checkout.CheckoutURL, nil
+}
+
+func (p *Provider) VerifyWebhook(
+	_ context.Context,
+	body []byte,
+	signature string,
+) (*payments.WebhookEvent, error) {
+
+	if p.WebhookSecret == "" {
+		return nil, fmt.Errorf("webhook secret is not configured")
+	}
+
+	mac := hmac.New(sha256.New, []byte(p.WebhookSecret))
+	mac.Write(body)
+	expected := hex.EncodeToString(mac.Sum(nil))
+
+	if !hmac.Equal([]byte(expected), []byte(signature)) {
+		return nil, fmt.Errorf("invalid webhook signature")
+	}
+
+	var payload webhookPayload
+
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return nil, fmt.Errorf("invalid webhook payload: %w", err)
+	}
+
+	return &payments.WebhookEvent{
+		ProviderSubscriptionID: payload.Data.SubscriptionID,
+		ProviderCustomerID:     payload.Data.CustomerID,
+		Plan:                   payload.Data.ProductID,
+		Status:                 payload.Data.Status,
+		OrganizationID:         payload.Data.Metadata["organization_id"],
+		CurrentPeriodEnd:       payload.Data.CurrentPeriodEnd,
+	}, nil
 }
