@@ -8,4 +8,15 @@ type Provider interface {
 		organizationID string,
 		plan string,
 	) (string, error)
+
+	VerifyWebhookSignature(
+		payload []byte,
+		headers WebhookHeaders,
+	) error
+}
+
+type WebhookHeaders struct {
+	ID        string
+	Signature string
+	Timestamp string
 }

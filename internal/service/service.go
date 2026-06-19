@@ -22,7 +22,7 @@ func New(
 ) *Service {
 
 	return &Service{
-		Repository:  repo,
-		Audit:       auditLogger,
+		Repository: repo,
+		Audit:      auditLogger,
 	}
 }

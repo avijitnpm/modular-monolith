@@ -41,7 +41,6 @@ type Store interface {
 		currentPeriodEnd *time.Time,
 	) error
 }
-
 type AuditLogger interface {
 	Log(ctx context.Context, event *audit.Event) error
 }
@@ -279,3 +278,5 @@ func (s *Service) logAudit(
 		Metadata:       metadata,
 	})
 }
+
+

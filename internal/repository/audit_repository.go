@@ -48,13 +48,13 @@ func (r *Repository) CreateAuditLog(
 }
 
 type AuditLog struct {
-	ID             string
-	Action         string
-	EntityType     string
-	EntityID       *string
-	UserID         *string
-	Metadata       map[string]string
-	CreatedAt      string
+	ID         string
+	Action     string
+	EntityType string
+	EntityID   *string
+	UserID     *string
+	Metadata   map[string]string
+	CreatedAt  string
 }
 
 func (r *Repository) ListAuditLogs(

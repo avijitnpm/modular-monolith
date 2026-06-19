@@ -11,8 +11,8 @@ import (
 	"github.com/avijitnpm/modular-monolith/internal/auth"
 	"github.com/avijitnpm/modular-monolith/internal/config"
 	"github.com/avijitnpm/modular-monolith/internal/middleware"
-	"github.com/avijitnpm/modular-monolith/internal/modules/authflow"
 	"github.com/avijitnpm/modular-monolith/internal/modules/auditmod"
+	"github.com/avijitnpm/modular-monolith/internal/modules/authflow"
 	"github.com/avijitnpm/modular-monolith/internal/modules/billing"
 	"github.com/avijitnpm/modular-monolith/internal/modules/organizations"
 	"github.com/avijitnpm/modular-monolith/internal/modules/rbac"
@@ -102,6 +102,7 @@ func registerRoutes(
 
 	billingProvider := dodo.NewProvider(
 		os.Getenv("DODO_API_KEY"),
+		os.Getenv("DODO_WEBHOOK_SECRET"),
 	)
 
 	billingService := billing.NewService(
@@ -160,6 +161,12 @@ func registerRoutes(
 		api.Post(
 			"/admin/bootstrap-rbac",
 			rbacHandler.BootstrapRBAC,
+		)
+
+		// WEBHOOK (public, signature-verified)
+		api.Post(
+			"/billing/webhook",
+			billingHandler.HandleWebhook,
 		)
 
 		// PROTECTED ROUTES

@@ -258,6 +258,13 @@ func (f *fakeCheckoutProvider) CreateCheckoutSession(
 	return f.url, f.err
 }
 
+func (f *fakeCheckoutProvider) VerifyWebhookSignature(
+	_ []byte,
+	_ payments.WebhookHeaders,
+) error {
+	return nil
+}
+
 type fakeAuditLogger struct {
 	events []*audit.Event
 }
@@ -463,3 +470,4 @@ func TestServiceWebhookIdempotentNoAudit(t *testing.T) {
 		t.Fatalf("expected 0 audit events for idempotent webhook, got %d", len(auditLog.events))
 	}
 }
+

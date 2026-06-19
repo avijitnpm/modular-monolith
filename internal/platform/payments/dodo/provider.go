@@ -3,19 +3,27 @@ package dodo
 import (
 	"bytes"
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"math"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
+
+	"github.com/avijitnpm/modular-monolith/internal/platform/payments"
 )
 
 const defaultBaseURL = "https://test.dodopayments.com"
 
 type Provider struct {
-	APIKey     string
-	BaseURL    string
-	HTTPClient *http.Client
+	APIKey        string
+	WebhookSecret string
+	BaseURL       string
+	HTTPClient    *http.Client
 }
 
 type checkoutRequest struct {
@@ -34,11 +42,13 @@ type checkoutResponse struct {
 
 func NewProvider(
 	apiKey string,
+	webhookSecret string,
 ) *Provider {
 
 	return &Provider{
-		APIKey:  strings.TrimSpace(apiKey),
-		BaseURL: defaultBaseURL,
+		APIKey:        strings.TrimSpace(apiKey),
+		WebhookSecret: strings.TrimSpace(webhookSecret),
+		BaseURL:       defaultBaseURL,
 		HTTPClient: &http.Client{
 			Timeout: 10 * time.Second,
 		},
@@ -110,4 +120,58 @@ func (p *Provider) CreateCheckoutSession(
 	}
 
 	return checkout.CheckoutURL, nil
+}
+
+const webhookTimestampTolerance = 5 * time.Minute
+
+func (p *Provider) VerifyWebhookSignature(
+	payload []byte,
+	headers payments.WebhookHeaders,
+) error {
+
+	if p.WebhookSecret == "" {
+		return fmt.Errorf("webhook secret is not configured")
+	}
+
+	if headers.ID == "" || headers.Signature == "" || headers.Timestamp == "" {
+		return fmt.Errorf("missing required webhook headers")
+	}
+
+	ts, err := strconv.ParseInt(headers.Timestamp, 10, 64)
+	if err != nil {
+		return fmt.Errorf("invalid webhook timestamp")
+	}
+
+	now := time.Now().Unix()
+	if math.Abs(float64(now-ts)) > webhookTimestampTolerance.Seconds() {
+		return fmt.Errorf("webhook timestamp too old or too new")
+	}
+
+	secret := p.WebhookSecret
+	if strings.HasPrefix(secret, "whsec_") {
+		secret = secret[6:]
+	}
+
+	secretBytes, err := base64.StdEncoding.DecodeString(secret)
+	if err != nil {
+		return fmt.Errorf("invalid webhook secret encoding")
+	}
+
+	signedContent := fmt.Sprintf("%s.%s.%s", headers.ID, headers.Timestamp, string(payload))
+
+	mac := hmac.New(sha256.New, secretBytes)
+	mac.Write([]byte(signedContent))
+	expected := base64.StdEncoding.EncodeToString(mac.Sum(nil))
+
+	for _, sig := range strings.Split(headers.Signature, " ") {
+		parts := strings.SplitN(sig, ",", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		if parts[0] == "v1" && hmac.Equal([]byte(parts[1]), []byte(expected)) {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("webhook signature verification failed")
 }
