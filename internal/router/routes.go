@@ -97,6 +97,7 @@ func registerRoutes(
 
 	billingProvider := dodo.NewProvider(
 		os.Getenv("DODO_API_KEY"),
+		os.Getenv("DODO_WEBHOOK_SECRET"),
 	)
 
 	billingService := billing.NewService(
@@ -154,6 +155,12 @@ func registerRoutes(
 		api.Post(
 			"/admin/bootstrap-rbac",
 			rbacHandler.BootstrapRBAC,
+		)
+
+		// WEBHOOK (public, signature-verified)
+		api.Post(
+			"/billing/webhook",
+			billingHandler.HandleWebhook,
 		)
 
 		// PROTECTED ROUTES

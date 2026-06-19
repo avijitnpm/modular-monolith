@@ -216,6 +216,14 @@ func (f *fakeBillingStore) UpdateSubscription(
 	return f.updateSubscription, f.updateErr
 }
 
+func (f *fakeBillingStore) UpsertSubscriptionByProvider(
+	_ context.Context,
+	_, _, _, _, _, _ string,
+	_ *time.Time,
+) error {
+	return nil
+}
+
 func testSubscription() *Subscription {
 	return &Subscription{
 		ID:             "subscription-1",
@@ -245,4 +253,11 @@ func (f *fakeCheckoutProvider) CreateCheckoutSession(
 	f.plan = plan
 
 	return f.url, f.err
+}
+
+func (f *fakeCheckoutProvider) VerifyWebhookSignature(
+	_ []byte,
+	_ payments.WebhookHeaders,
+) error {
+	return nil
 }
