@@ -278,5 +278,3 @@ func (s *Service) logAudit(
 		Metadata:       metadata,
 	})
 }
-
-
