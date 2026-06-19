@@ -10,4 +10,6 @@ type Event struct {
 	EntityType string
 
 	EntityID string
+
+	Metadata map[string]string
 }

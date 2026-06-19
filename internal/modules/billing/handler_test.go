@@ -17,7 +17,7 @@ func TestHandlerCreateBillingCreatesSubscription(t *testing.T) {
 	store := &fakeBillingStore{
 		createSubscription: testSubscription(),
 	}
-	handler := NewHandler(NewService(store, nil))
+	handler := NewHandler(NewService(store, nil, nil))
 	req := billingRequest(
 		http.MethodPost,
 		"/api/v1/billing",
@@ -48,6 +48,7 @@ func TestHandlerCreateCheckoutReturnsURL(t *testing.T) {
 			&fakeCheckoutProvider{
 				url: "https://checkout.example/session-1",
 			},
+			nil,
 		),
 	)
 	req := billingRequest(
@@ -74,6 +75,7 @@ func TestHandlerCreateCheckoutRejectsMissingPlan(t *testing.T) {
 		NewService(
 			&fakeBillingStore{},
 			&fakeCheckoutProvider{},
+			nil,
 		),
 	)
 	req := billingRequest(
@@ -92,7 +94,7 @@ func TestHandlerCreateCheckoutRejectsMissingPlan(t *testing.T) {
 }
 
 func TestHandlerCreateBillingRejectsInvalidJSON(t *testing.T) {
-	handler := NewHandler(NewService(&fakeBillingStore{}, nil))
+	handler := NewHandler(NewService(&fakeBillingStore{}, nil, nil))
 	req := billingRequest(
 		http.MethodPost,
 		"/api/v1/billing",
@@ -109,7 +111,7 @@ func TestHandlerCreateBillingRejectsInvalidJSON(t *testing.T) {
 }
 
 func TestHandlerCreateBillingRejectsMissingFields(t *testing.T) {
-	handler := NewHandler(NewService(&fakeBillingStore{}, nil))
+	handler := NewHandler(NewService(&fakeBillingStore{}, nil, nil))
 	req := billingRequest(
 		http.MethodPost,
 		"/api/v1/billing",
@@ -131,6 +133,7 @@ func TestHandlerCreateBillingReturnsConflict(t *testing.T) {
 			&fakeBillingStore{
 				createErr: ErrSubscriptionAlreadyExists,
 			},
+			nil,
 			nil,
 		),
 	)
@@ -161,7 +164,7 @@ func TestHandlerUpdateBillingUpdatesSubscription(t *testing.T) {
 			CurrentPeriodEnd: &currentPeriodEnd,
 		},
 	}
-	handler := NewHandler(NewService(store, nil))
+	handler := NewHandler(NewService(store, nil, nil))
 	req := billingUpdateRequest(
 		http.MethodPatch,
 		"/api/v1/billing/subscription-1",
@@ -200,6 +203,7 @@ func TestHandlerUpdateBillingReturnsNotFound(t *testing.T) {
 				updateErr: ErrSubscriptionNotFound,
 			},
 			nil,
+			nil,
 		),
 	)
 	req := billingUpdateRequest(
@@ -225,6 +229,7 @@ func TestHandlerUpdateBillingReturnsInternalError(t *testing.T) {
 				updateErr: errors.New("update failed"),
 			},
 			nil,
+			nil,
 		),
 	)
 	req := billingUpdateRequest(
@@ -244,7 +249,7 @@ func TestHandlerUpdateBillingReturnsInternalError(t *testing.T) {
 }
 
 func TestHandlerGetBillingRejectsMissingOrganizationContext(t *testing.T) {
-	handler := NewHandler(NewService(&fakeBillingStore{}, nil))
+	handler := NewHandler(NewService(&fakeBillingStore{}, nil, nil))
 	req := httptest.NewRequest(
 		http.MethodGet,
 		"/api/v1/billing",

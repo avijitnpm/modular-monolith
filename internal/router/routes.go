@@ -12,6 +12,7 @@ import (
 	"github.com/avijitnpm/modular-monolith/internal/config"
 	"github.com/avijitnpm/modular-monolith/internal/middleware"
 	"github.com/avijitnpm/modular-monolith/internal/modules/authflow"
+	"github.com/avijitnpm/modular-monolith/internal/modules/auditmod"
 	"github.com/avijitnpm/modular-monolith/internal/modules/billing"
 	"github.com/avijitnpm/modular-monolith/internal/modules/organizations"
 	"github.com/avijitnpm/modular-monolith/internal/modules/rbac"
@@ -69,6 +70,10 @@ func registerRoutes(
 		service.Repository,
 	)
 
+	auditHandler := auditmod.NewHandler(
+		auditService,
+	)
+
 	userHandler := users.NewHandler(
 		service,
 		auditService,
@@ -102,6 +107,7 @@ func registerRoutes(
 	billingService := billing.NewService(
 		billingRepository,
 		billingProvider,
+		auditService,
 	)
 
 	billingHandler := billing.NewHandler(
@@ -241,6 +247,16 @@ func registerRoutes(
 			).Post(
 				"/users/{id}/roles",
 				rbacHandler.AssignRoleToUser,
+			)
+
+			protected.With(
+				rbac.RequirePermission(
+					rbacService,
+					"audit.read",
+				),
+			).Get(
+				"/audit",
+				auditHandler.ListAuditLogs,
 			)
 		})
 	})

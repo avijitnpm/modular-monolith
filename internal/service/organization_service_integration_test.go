@@ -35,6 +35,7 @@ func TestRegisterOrganizationBootstrapsRBAC(t *testing.T) {
 
 	svc := New(
 		repository.New(pool),
+		nil,
 	)
 
 	suffix := time.Now().UTC().Format("20060102150405.000000000")

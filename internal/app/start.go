@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/avijitnpm/modular-monolith/internal/audit"
 	"github.com/avijitnpm/modular-monolith/internal/config"
 	"github.com/avijitnpm/modular-monolith/internal/database"
 	"github.com/avijitnpm/modular-monolith/internal/repository"
@@ -55,7 +56,7 @@ func New() (*App, error) {
 
 	repo := repository.New(db)
 
-	svc := service.New(repo)
+	svc := service.New(repo, audit.NewService(repo))
 
 	return &App{
 		Config: cfg,
