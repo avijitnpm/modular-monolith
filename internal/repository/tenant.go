@@ -3,39 +3,16 @@ package repository
 import (
 	"context"
 
-	appcontext "github.com/avijitnpm/modular-monolith/internal/context"
 	"github.com/avijitnpm/modular-monolith/internal/database"
+	"github.com/jackc/pgx/v5"
 )
 
-func (r *Repository) WithTenantContext(
+// WithTenantQuery executes fn inside a transaction where
+// app.current_organization_id has been set via SET LOCAL.
+func (r *Repository) WithTenantQuery(
 	ctx context.Context,
+	organizationID string,
+	fn func(tx pgx.Tx) error,
 ) error {
-
-	organizationID, ok := appcontext.GetOrganizationID(
-		ctx,
-	)
-
-	if !ok {
-		return nil
-	}
-
-	tx, err := r.DB.Begin(ctx)
-
-	if err != nil {
-		return err
-	}
-
-	defer tx.Rollback(ctx)
-
-	err = database.SetTenantContext(
-		ctx,
-		tx,
-		organizationID,
-	)
-
-	if err != nil {
-		return err
-	}
-
-	return tx.Commit(ctx)
+	return database.WithTenantQuery(r.DB, ctx, organizationID, fn)
 }
