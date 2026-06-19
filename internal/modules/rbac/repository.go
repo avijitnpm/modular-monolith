@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/avijitnpm/modular-monolith/internal/database"
 	"github.com/jackc/pgconn"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -72,79 +73,89 @@ func (r *Repository) ListRoles(
 	organizationID string,
 ) ([]Role, error) {
 
-	rows, err := r.DB.Query(
-		ctx,
-		`
-			SELECT
-				r.id,
-				r.organization_id,
-				r.name,
-				r.created_at,
-				r.updated_at,
-				COALESCE(
-					jsonb_agg(
-						jsonb_build_object(
-							'id', p.id::text,
-							'name', p.name,
-							'created_at', p.created_at
-						)
-						ORDER BY p.name
-					) FILTER (WHERE p.id IS NOT NULL),
-					'[]'::jsonb
-				)
-			FROM roles r
-			LEFT JOIN role_permissions rp
-				ON rp.role_id = r.id
-				AND rp.organization_id = r.organization_id
-			LEFT JOIN permissions p
-				ON p.id = rp.permission_id
-			WHERE r.organization_id = $1
-			GROUP BY r.id, r.organization_id, r.name, r.created_at, r.updated_at
-			ORDER BY r.name
-		`,
-		organizationID,
-	)
+	var roles []Role
+
+	err := database.WithTenantQuery(r.DB, ctx, organizationID, func(tx pgx.Tx) error {
+		rows, err := tx.Query(
+			ctx,
+			`
+				SELECT
+					r.id,
+					r.organization_id,
+					r.name,
+					r.created_at,
+					r.updated_at,
+					COALESCE(
+						jsonb_agg(
+							jsonb_build_object(
+								'id', p.id::text,
+								'name', p.name,
+								'created_at', p.created_at
+							)
+							ORDER BY p.name
+						) FILTER (WHERE p.id IS NOT NULL),
+						'[]'::jsonb
+					)
+				FROM roles r
+				LEFT JOIN role_permissions rp
+					ON rp.role_id = r.id
+					AND rp.organization_id = r.organization_id
+				LEFT JOIN permissions p
+					ON p.id = rp.permission_id
+				WHERE r.organization_id = $1
+				GROUP BY r.id, r.organization_id, r.name, r.created_at, r.updated_at
+				ORDER BY r.name
+			`,
+			organizationID,
+		)
+
+		if err != nil {
+			return err
+		}
+
+		defer rows.Close()
+
+		roles = []Role{}
+
+		for rows.Next() {
+			var role Role
+			var permissionsJSON []byte
+
+			err = rows.Scan(
+				&role.ID,
+				&role.OrganizationID,
+				&role.Name,
+				&role.CreatedAt,
+				&role.UpdatedAt,
+				&permissionsJSON,
+			)
+
+			if err != nil {
+				return err
+			}
+
+			role.Permissions, err = decodePermissions(
+				permissionsJSON,
+			)
+
+			if err != nil {
+				return err
+			}
+
+			roles = append(
+				roles,
+				role,
+			)
+		}
+
+		return rows.Err()
+	})
 
 	if err != nil {
 		return nil, err
 	}
 
-	defer rows.Close()
-
-	roles := []Role{}
-
-	for rows.Next() {
-		var role Role
-		var permissionsJSON []byte
-
-		err = rows.Scan(
-			&role.ID,
-			&role.OrganizationID,
-			&role.Name,
-			&role.CreatedAt,
-			&role.UpdatedAt,
-			&permissionsJSON,
-		)
-
-		if err != nil {
-			return nil, err
-		}
-
-		role.Permissions, err = decodePermissions(
-			permissionsJSON,
-		)
-
-		if err != nil {
-			return nil, err
-		}
-
-		roles = append(
-			roles,
-			role,
-		)
-	}
-
-	return roles, rows.Err()
+	return roles, nil
 }
 
 func (r *Repository) CreateRole(
@@ -156,42 +167,39 @@ func (r *Repository) CreateRole(
 
 	var createdRole *Role
 
-	err := r.withTx(
-		ctx,
-		func(tx pgx.Tx) error {
-			role, err := insertRole(
-				ctx,
-				tx,
-				organizationID,
-				name,
-			)
+	err := database.WithTenantQuery(r.DB, ctx, organizationID, func(tx pgx.Tx) error {
+		role, err := insertRole(
+			ctx,
+			tx,
+			organizationID,
+			name,
+		)
 
-			if err != nil {
-				return err
-			}
-
-			err = assignRolePermissions(
-				ctx,
-				tx,
-				organizationID,
-				role.ID,
-				permissionNames,
-			)
-
-			if err != nil {
-				return err
-			}
-
-			createdRole, err = getRole(
-				ctx,
-				tx,
-				organizationID,
-				role.ID,
-			)
-
+		if err != nil {
 			return err
-		},
-	)
+		}
+
+		err = assignRolePermissions(
+			ctx,
+			tx,
+			organizationID,
+			role.ID,
+			permissionNames,
+		)
+
+		if err != nil {
+			return err
+		}
+
+		createdRole, err = getRole(
+			ctx,
+			tx,
+			organizationID,
+			role.ID,
+		)
+
+		return err
+	})
 
 	if err != nil {
 		return nil, err
@@ -205,16 +213,13 @@ func (r *Repository) BootstrapDefaultRoles(
 	organizationID string,
 ) error {
 
-	return r.withTx(
-		ctx,
-		func(tx pgx.Tx) error {
-			return BootstrapDefaultRolesTx(
-				ctx,
-				tx,
-				organizationID,
-			)
-		},
-	)
+	return database.WithTenantQuery(r.DB, ctx, organizationID, func(tx pgx.Tx) error {
+		return BootstrapDefaultRolesTx(
+			ctx,
+			tx,
+			organizationID,
+		)
+	})
 }
 
 func (r *Repository) AssignRoleToUser(
@@ -226,23 +231,25 @@ func (r *Repository) AssignRoleToUser(
 
 	assignment := &UserRole{}
 
-	err := r.DB.QueryRow(
-		ctx,
-		`
-			INSERT INTO user_roles (organization_id, user_id, role_id)
-			VALUES ($1, $2, $3)
-			RETURNING id, organization_id, user_id, role_id, created_at
-		`,
-		organizationID,
-		userID,
-		roleID,
-	).Scan(
-		&assignment.ID,
-		&assignment.OrganizationID,
-		&assignment.UserID,
-		&assignment.RoleID,
-		&assignment.CreatedAt,
-	)
+	err := database.WithTenantQuery(r.DB, ctx, organizationID, func(tx pgx.Tx) error {
+		return tx.QueryRow(
+			ctx,
+			`
+				INSERT INTO user_roles (organization_id, user_id, role_id)
+				VALUES ($1, $2, $3)
+				RETURNING id, organization_id, user_id, role_id, created_at
+			`,
+			organizationID,
+			userID,
+			roleID,
+		).Scan(
+			&assignment.ID,
+			&assignment.OrganizationID,
+			&assignment.UserID,
+			&assignment.RoleID,
+			&assignment.CreatedAt,
+		)
+	})
 
 	if err != nil {
 		return nil, mapConstraintError(err)
@@ -260,25 +267,27 @@ func (r *Repository) RemoveRoleFromUser(
 
 	assignment := &UserRole{}
 
-	err := r.DB.QueryRow(
-		ctx,
-		`
-			DELETE FROM user_roles
-			WHERE organization_id = $1
-				AND user_id = $2
-				AND role_id = $3
-			RETURNING id, organization_id, user_id, role_id, created_at
-		`,
-		organizationID,
-		userID,
-		roleID,
-	).Scan(
-		&assignment.ID,
-		&assignment.OrganizationID,
-		&assignment.UserID,
-		&assignment.RoleID,
-		&assignment.CreatedAt,
-	)
+	err := database.WithTenantQuery(r.DB, ctx, organizationID, func(tx pgx.Tx) error {
+		return tx.QueryRow(
+			ctx,
+			`
+				DELETE FROM user_roles
+				WHERE organization_id = $1
+					AND user_id = $2
+					AND role_id = $3
+				RETURNING id, organization_id, user_id, role_id, created_at
+			`,
+			organizationID,
+			userID,
+			roleID,
+		).Scan(
+			&assignment.ID,
+			&assignment.OrganizationID,
+			&assignment.UserID,
+			&assignment.RoleID,
+			&assignment.CreatedAt,
+		)
+	})
 
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrUserRoleNotFound
@@ -300,55 +309,35 @@ func (r *Repository) UserHasPermission(
 
 	var exists bool
 
-	err := r.DB.QueryRow(
-		ctx,
-		`
-			SELECT EXISTS (
-				SELECT 1
-				FROM users u
-				JOIN user_roles ur
-					ON ur.user_id = u.id
-					AND ur.organization_id = u.organization_id
-				JOIN role_permissions rp
-					ON rp.role_id = ur.role_id
-					AND rp.organization_id = ur.organization_id
-				JOIN permissions p
-					ON p.id = rp.permission_id
-				WHERE u.organization_id = $1
-					AND u.zitadel_user_id = $2
-					AND p.name = $3
-			)
-		`,
-		organizationID,
-		zitadelUserID,
-		permission,
-	).Scan(
-		&exists,
-	)
+	err := database.WithTenantQuery(r.DB, ctx, organizationID, func(tx pgx.Tx) error {
+		return tx.QueryRow(
+			ctx,
+			`
+				SELECT EXISTS (
+					SELECT 1
+					FROM users u
+					JOIN user_roles ur
+						ON ur.user_id = u.id
+						AND ur.organization_id = u.organization_id
+					JOIN role_permissions rp
+						ON rp.role_id = ur.role_id
+						AND rp.organization_id = ur.organization_id
+					JOIN permissions p
+						ON p.id = rp.permission_id
+					WHERE u.organization_id = $1
+						AND u.zitadel_user_id = $2
+						AND p.name = $3
+				)
+			`,
+			organizationID,
+			zitadelUserID,
+			permission,
+		).Scan(
+			&exists,
+		)
+	})
 
 	return exists, err
-}
-
-func (r *Repository) withTx(
-	ctx context.Context,
-	fn func(tx pgx.Tx) error,
-) error {
-
-	tx, err := r.DB.Begin(ctx)
-
-	if err != nil {
-		return err
-	}
-
-	defer tx.Rollback(ctx)
-
-	err = fn(tx)
-
-	if err != nil {
-		return err
-	}
-
-	return tx.Commit(ctx)
 }
 
 func BootstrapDefaultRolesTx(
@@ -356,6 +345,10 @@ func BootstrapDefaultRolesTx(
 	tx pgx.Tx,
 	organizationID string,
 ) error {
+
+	if err := database.SetTenantContext(ctx, tx, organizationID); err != nil {
+		return err
+	}
 
 	_, err := tx.Exec(
 		ctx,
