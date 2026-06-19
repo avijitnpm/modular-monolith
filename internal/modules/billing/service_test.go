@@ -470,4 +470,3 @@ func TestServiceWebhookIdempotentNoAudit(t *testing.T) {
 		t.Fatalf("expected 0 audit events for idempotent webhook, got %d", len(auditLog.events))
 	}
 }
-
