@@ -4,46 +4,67 @@ import (
 	"net"
 	"net/http"
 	"sync"
+	"time"
 
 	appcontext "github.com/avijitnpm/modular-monolith/internal/context"
 	"github.com/avijitnpm/modular-monolith/pkg/response"
 	"golang.org/x/time/rate"
 )
 
+const (
+	cleanupInterval = 3 * time.Minute
+	staleTimeout    = 3 * time.Minute
+)
+
+type visitor struct {
+	limiter  *rate.Limiter
+	lastSeen time.Time
+}
+
 type rateLimiter struct {
 	mu       sync.Mutex
-	limiters map[string]*rate.Limiter
+	visitors map[string]*visitor
 	rate     rate.Limit
 	burst    int
 }
 
 func newRateLimiter(r rate.Limit, burst int) *rateLimiter {
-	return &rateLimiter{
-		limiters: make(map[string]*rate.Limiter),
+	rl := &rateLimiter{
+		visitors: make(map[string]*visitor),
 		rate:     r,
 		burst:    burst,
 	}
+	go rl.cleanup()
+	return rl
 }
 
 func (rl *rateLimiter) get(key string) *rate.Limiter {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
 
-	l, exists := rl.limiters[key]
+	v, exists := rl.visitors[key]
 	if !exists {
-		l = rate.NewLimiter(rl.rate, rl.burst)
-		rl.limiters[key] = l
+		v = &visitor{limiter: rate.NewLimiter(rl.rate, rl.burst)}
+		rl.visitors[key] = v
 	}
-	return l
+	v.lastSeen = time.Now()
+	return v.limiter
+}
+
+func (rl *rateLimiter) cleanup() {
+	for {
+		time.Sleep(cleanupInterval)
+		rl.mu.Lock()
+		for key, v := range rl.visitors {
+			if time.Since(v.lastSeen) > staleTimeout {
+				delete(rl.visitors, key)
+			}
+		}
+		rl.mu.Unlock()
+	}
 }
 
 func clientIP(r *http.Request) string {
-	if ip := r.Header.Get("X-Forwarded-For"); ip != "" {
-		return ip
-	}
-	if ip := r.Header.Get("X-Real-IP"); ip != "" {
-		return ip
-	}
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
 		return r.RemoteAddr

@@ -20,8 +20,9 @@ func Load() (*Config, error) {
 
 	cfg := &Config{
 		App: AppConfig{
-			Name: k.String("APP_NAME"),
-			Env:  k.String("APP_ENV"),
+			Name:       k.String("APP_NAME"),
+			Env:        k.String("APP_ENV"),
+			CORSOrigin: k.String("CORS_ORIGIN"),
 		},
 		Server: ServerConfig{
 			Port: k.String("SERVER_PORT"),
@@ -47,6 +48,9 @@ func Load() (*Config, error) {
 			ServiceName: k.String("OTEL_SERVICE_NAME"),
 			Endpoint:    k.String("OTEL_EXPORTER_OTLP_ENDPOINT"),
 			Insecure:    k.Bool("OTEL_EXPORTER_OTLP_INSECURE"),
+		},
+		Metrics: MetricsConfig{
+			Token: k.String("METRICS_TOKEN"),
 		},
 	}
 

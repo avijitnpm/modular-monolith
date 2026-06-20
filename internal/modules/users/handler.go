@@ -2,11 +2,13 @@ package users
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	"github.com/avijitnpm/modular-monolith/internal/audit"
 	appcontext "github.com/avijitnpm/modular-monolith/internal/context"
 	"github.com/avijitnpm/modular-monolith/internal/service"
+	appErrors "github.com/avijitnpm/modular-monolith/pkg/errors"
 	"github.com/avijitnpm/modular-monolith/pkg/response"
 )
 
@@ -75,6 +77,17 @@ func (h *Handler) RegisterUser(
 		return
 	}
 
+	validationErrors := req.Validate()
+
+	if validationErrors != nil {
+		response.ValidationError(
+			w,
+			validationErrors,
+		)
+
+		return
+	}
+
 	user, err := h.Service.RegisterUser(
 		r.Context(),
 		organizationID,
@@ -83,6 +96,11 @@ func (h *Handler) RegisterUser(
 	)
 
 	if err != nil {
+
+		if errors.Is(err, appErrors.ErrUserAlreadyExists) {
+			response.Error(w, http.StatusConflict, "user already exists")
+			return
+		}
 
 		response.InternalServerError(
 			w,

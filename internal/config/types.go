@@ -7,11 +7,17 @@ type Config struct {
 	Auth     AuthConfig
 	Payments PaymentConfig
 	OTEL     OTELConfig
+	Metrics  MetricsConfig
+}
+
+type MetricsConfig struct {
+	Token string
 }
 
 type AppConfig struct {
-	Name string
-	Env  string
+	Name       string
+	Env        string
+	CORSOrigin string
 }
 
 type ServerConfig struct {

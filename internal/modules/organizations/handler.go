@@ -3,8 +3,10 @@ package organizations
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 
+	appErrors "github.com/avijitnpm/modular-monolith/pkg/errors"
 	"github.com/avijitnpm/modular-monolith/internal/repository"
 	"github.com/avijitnpm/modular-monolith/pkg/response"
 )
@@ -68,6 +70,11 @@ func (h *Handler) CreateOrganization(
 	)
 
 	if err != nil {
+		if errors.Is(err, appErrors.ErrOrganizationAlreadyExists) {
+			response.Error(w, http.StatusConflict, "organization already exists")
+			return
+		}
+
 		response.InternalServerError(
 			w,
 			"failed to create organization",

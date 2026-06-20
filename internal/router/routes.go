@@ -3,7 +3,6 @@ package router
 import (
 	"log/slog"
 	"net/http"
-	"os"
 
 	"github.com/go-chi/chi/v5"
 
@@ -102,8 +101,8 @@ func registerRoutes(
 	)
 
 	billingProvider := dodo.NewProvider(
-		os.Getenv("DODO_API_KEY"),
-		os.Getenv("DODO_WEBHOOK_SECRET"),
+		cfg.Payments.DodoAPIKey,
+		cfg.Payments.WebhookSecret,
 	)
 
 	billingService := billing.NewService(
@@ -132,10 +131,12 @@ func registerRoutes(
 			w.Write([]byte("pong"))
 		})
 
-		api.Get(
-			"/token",
-			users.GenerateToken,
-		)
+		if cfg.App.Env == "development" {
+			api.Get(
+				"/token",
+				users.GenerateToken,
+			)
+		}
 
 		api.With(middleware.PublicRateLimit()).Get(
 			"/auth/login",
@@ -160,12 +161,6 @@ func registerRoutes(
 		api.With(middleware.PublicRateLimit()).Post(
 			"/organizations",
 			organizationHandler.CreateOrganization,
-		)
-
-		// TEMPORARY RBAC VERIFICATION ENDPOINT
-		api.Post(
-			"/admin/bootstrap-rbac",
-			rbacHandler.BootstrapRBAC,
 		)
 
 		// WEBHOOK (public, signature-verified)

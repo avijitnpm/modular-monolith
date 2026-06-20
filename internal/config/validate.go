@@ -41,5 +41,13 @@ func validate(cfg *Config) error {
 		return errors.New("SESSION_SECRET must be at least 32 characters")
 	}
 
+	if cfg.Payments.DodoAPIKey == "" {
+		return errors.New("DODO_API_KEY is required")
+	}
+
+	if cfg.Payments.WebhookSecret == "" {
+		return errors.New("DODO_WEBHOOK_SECRET is required")
+	}
+
 	return nil
 }

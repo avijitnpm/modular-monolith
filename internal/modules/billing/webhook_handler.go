@@ -30,9 +30,15 @@ func (h *Handler) HandleWebhook(
 	w http.ResponseWriter,
 	r *http.Request,
 ) {
+	const maxWebhookBody = 1 << 20 // 1 MB
 
+	r.Body = http.MaxBytesReader(w, r.Body, maxWebhookBody)
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
+		if err.Error() == "http: request body too large" {
+			response.Error(w, http.StatusRequestEntityTooLarge, "request body too large")
+			return
+		}
 		response.BadRequest(w, "failed to read request body")
 		return
 	}

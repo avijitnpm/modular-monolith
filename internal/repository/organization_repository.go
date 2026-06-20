@@ -3,6 +3,8 @@ package repository
 import (
 	"context"
 
+	appErrors "github.com/avijitnpm/modular-monolith/pkg/errors"
+	"github.com/jackc/pgconn"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -62,6 +64,10 @@ func (r *Repository) CreateOrganizationTx(
 	)
 
 	if err != nil {
+		pgErr, ok := err.(*pgconn.PgError)
+		if ok && pgErr.Code == appErrors.PostgresUniqueViolation {
+			return nil, appErrors.ErrOrganizationAlreadyExists
+		}
 		return nil, err
 	}
 

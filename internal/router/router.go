@@ -23,6 +23,7 @@ func New(
 	r := chi.NewRouter()
 
 	r.Use(middleware.RequestID)
+	r.Use(middleware.CORS(cfg.App.CORSOrigin))
 
 	if cfg.OTEL.Enabled {
 		r.Use(otelhttp.NewMiddleware(
@@ -42,9 +43,10 @@ func New(
 	r.Use(middleware.Logging(logger))
 	r.Use(middleware.Recovery(logger))
 	r.Use(middleware.Security(cfg.App.Env == "development"))
+	r.Use(middleware.BodyLimit(1 << 20)) // 1 MB global body limit
 	r.Use(middleware.Metrics)
 
-	r.Get("/metrics", promhttp.Handler().ServeHTTP)
+	r.Get("/metrics", middleware.MetricsAuth(cfg.Metrics.Token, promhttp.Handler()).ServeHTTP)
 
 	registerRoutes(
 		r,

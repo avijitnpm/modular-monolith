@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	appcontext "github.com/avijitnpm/modular-monolith/internal/context"
 	"github.com/avijitnpm/modular-monolith/pkg/response"
@@ -197,5 +198,51 @@ func TestMiddleware_CallsNextHandler(t *testing.T) {
 
 	if !called {
 		t.Fatal("next handler was not called")
+	}
+}
+
+func TestRateLimiter_EvictsStaleEntries(t *testing.T) {
+	rl := &rateLimiter{
+		visitors: make(map[string]*visitor),
+		rate:     1,
+		burst:    1,
+	}
+
+	rl.get("active")
+	rl.get("stale")
+
+	// Manually age the stale entry
+	rl.mu.Lock()
+	rl.visitors["stale"].lastSeen = time.Now().Add(-4 * time.Minute)
+	rl.mu.Unlock()
+
+	// Run cleanup inline
+	rl.mu.Lock()
+	for key, v := range rl.visitors {
+		if time.Since(v.lastSeen) > staleTimeout {
+			delete(rl.visitors, key)
+		}
+	}
+	rl.mu.Unlock()
+
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+
+	if _, exists := rl.visitors["stale"]; exists {
+		t.Fatal("stale entry was not evicted")
+	}
+	if _, exists := rl.visitors["active"]; !exists {
+		t.Fatal("active entry was incorrectly evicted")
+	}
+}
+
+func TestClientIP_UsesRemoteAddr(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.RemoteAddr = "192.168.1.1:9999"
+	req.Header.Set("X-Forwarded-For", "10.0.0.1")
+
+	ip := clientIP(req)
+	if ip != "192.168.1.1" {
+		t.Fatalf("got %q, want %q", ip, "192.168.1.1")
 	}
 }

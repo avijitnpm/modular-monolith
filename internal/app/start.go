@@ -78,9 +78,20 @@ func (a *App) Start() error {
 		a.Service,
 	)
 
+	const (
+		readHeaderTimeout = 5 * time.Second
+		readTimeout       = 15 * time.Second
+		writeTimeout      = 30 * time.Second
+		idleTimeout       = 60 * time.Second
+	)
+
 	a.HTTPServer = &http.Server{
-		Addr:    ":" + a.Config.Server.Port,
-		Handler: r,
+		Addr:              ":" + a.Config.Server.Port,
+		Handler:           r,
+		ReadHeaderTimeout: readHeaderTimeout,
+		ReadTimeout:       readTimeout,
+		WriteTimeout:      writeTimeout,
+		IdleTimeout:       idleTimeout,
 	}
 
 	a.Logger.Info(

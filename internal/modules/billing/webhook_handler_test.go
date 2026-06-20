@@ -157,3 +157,24 @@ func webhookRequest(body string) *http.Request {
 	req.Header.Set("webhook-timestamp", fmt.Sprintf("%d", time.Now().Unix()))
 	return req
 }
+
+func TestHandleWebhookRejectsOversizedBody(t *testing.T) {
+	provider := &fakeWebhookProvider{}
+	handler := NewHandler(NewService(&fakeBillingStore{}, provider, nil))
+
+	// Create a body larger than 1 MB
+	oversized := strings.Repeat("x", 1<<20+1)
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/billing/webhook",
+		strings.NewReader(oversized),
+	)
+	req.Header.Set("Content-Type", "application/json")
+	recorder := httptest.NewRecorder()
+
+	handler.HandleWebhook(recorder, req)
+
+	if recorder.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("expected 413, got %d: %s", recorder.Code, recorder.Body.String())
+	}
+}
