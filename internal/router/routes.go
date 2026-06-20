@@ -14,6 +14,7 @@ import (
 	"github.com/avijitnpm/modular-monolith/internal/modules/auditmod"
 	"github.com/avijitnpm/modular-monolith/internal/modules/authflow"
 	"github.com/avijitnpm/modular-monolith/internal/modules/billing"
+	"github.com/avijitnpm/modular-monolith/internal/modules/health"
 	"github.com/avijitnpm/modular-monolith/internal/modules/organizations"
 	"github.com/avijitnpm/modular-monolith/internal/modules/rbac"
 	"github.com/avijitnpm/modular-monolith/internal/modules/users"
@@ -118,6 +119,10 @@ func registerRoutes(
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("ok"))
 	})
+
+	healthHandler := health.NewHandler(service.Repository.DB)
+	r.Get("/health/live", healthHandler.Live)
+	r.Get("/health/ready", healthHandler.Ready)
 
 	r.Route("/api/v1", func(api chi.Router) {
 
