@@ -18,34 +18,12 @@ func (s *Service) RegisterUser(
 	email string,
 ) (*repository.User, error) {
 
-	var createdUser *repository.User
-
-	err := s.WithTransaction(
+	return s.Repository.CreateUser(
 		ctx,
-		func(tx pgx.Tx) error {
-
-			user, err := s.Repository.CreateUser(
-				ctx,
-				organizationID,
-				zitadelUserID,
-				email,
-			)
-
-			if err != nil {
-				return err
-			}
-
-			createdUser = user
-
-			return nil
-		},
+		organizationID,
+		zitadelUserID,
+		email,
 	)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return createdUser, nil
 }
 
 func (s *Service) ProvisionAuthenticatedUser(
@@ -63,6 +41,7 @@ func (s *Service) ProvisionAuthenticatedUser(
 
 	_, err := s.Repository.FindUserByZitadelUserID(
 		ctx,
+		organizationID,
 		zitadelUserID,
 	)
 
@@ -91,6 +70,7 @@ func (s *Service) ProvisionAuthenticatedUser(
 	if errors.Is(err, appErrors.ErrUserAlreadyExists) {
 		_, err = s.Repository.FindUserByZitadelUserID(
 			ctx,
+			organizationID,
 			zitadelUserID,
 		)
 

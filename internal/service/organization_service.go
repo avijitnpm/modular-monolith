@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/avijitnpm/modular-monolith/internal/audit"
+	"github.com/avijitnpm/modular-monolith/internal/database"
 	"github.com/avijitnpm/modular-monolith/internal/modules/rbac"
 	"github.com/avijitnpm/modular-monolith/internal/repository"
 	"github.com/jackc/pgx/v5"
@@ -20,6 +21,10 @@ func (s *Service) RegisterOrganization(
 	err := s.WithTransaction(
 		ctx,
 		func(tx pgx.Tx) error {
+			if err := database.SetTenantContext(ctx, tx, zitadelOrgID); err != nil {
+				return err
+			}
+
 			org, err := s.Repository.CreateOrganizationTx(
 				ctx,
 				tx,
