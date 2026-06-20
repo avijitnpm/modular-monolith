@@ -10,6 +10,7 @@ import (
 	"github.com/avijitnpm/modular-monolith/internal/middleware"
 	"github.com/avijitnpm/modular-monolith/internal/service"
 	"github.com/go-chi/chi/v5"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
@@ -41,6 +42,9 @@ func New(
 	r.Use(middleware.Logging(logger))
 	r.Use(middleware.Recovery(logger))
 	r.Use(middleware.Security(cfg.App.Env == "development"))
+	r.Use(middleware.Metrics)
+
+	r.Get("/metrics", promhttp.Handler().ServeHTTP)
 
 	registerRoutes(
 		r,

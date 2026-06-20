@@ -132,12 +132,12 @@ func registerRoutes(
 			users.GenerateToken,
 		)
 
-		api.Get(
+		api.With(middleware.PublicRateLimit()).Get(
 			"/auth/login",
 			authHandler.Login,
 		)
 
-		api.Get(
+		api.With(middleware.PublicRateLimit()).Get(
 			"/auth/callback",
 			authHandler.Callback,
 		)
@@ -152,7 +152,7 @@ func registerRoutes(
 			authHandler.Me,
 		)
 
-		api.Post(
+		api.With(middleware.PublicRateLimit()).Post(
 			"/organizations",
 			organizationHandler.CreateOrganization,
 		)
@@ -164,7 +164,7 @@ func registerRoutes(
 		)
 
 		// WEBHOOK (public, signature-verified)
-		api.Post(
+		api.With(middleware.WebhookRateLimit()).Post(
 			"/billing/webhook",
 			billingHandler.HandleWebhook,
 		)
@@ -196,6 +196,7 @@ func registerRoutes(
 					rbacService,
 					"settings.write",
 				),
+				middleware.AuthenticatedRateLimit(),
 			).Post(
 				"/roles",
 				rbacHandler.CreateRole,
@@ -231,6 +232,7 @@ func registerRoutes(
 					rbacService,
 					"billing.write",
 				),
+				middleware.AuthenticatedRateLimit(),
 			).Post(
 				"/billing/checkout",
 				billingHandler.CreateCheckout,
@@ -251,6 +253,7 @@ func registerRoutes(
 					rbacService,
 					"settings.write",
 				),
+				middleware.AuthenticatedRateLimit(),
 			).Post(
 				"/users/{id}/roles",
 				rbacHandler.AssignRoleToUser,
