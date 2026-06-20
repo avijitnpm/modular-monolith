@@ -6,6 +6,14 @@ import (
 	"time"
 )
 
+// SensitiveHeaders must never be logged. If header logging is added
+// in the future, filter these out.
+var SensitiveHeaders = map[string]struct{}{
+	"Authorization": {},
+	"Cookie":        {},
+	"Set-Cookie":    {},
+}
+
 func Logging(logger *slog.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 
