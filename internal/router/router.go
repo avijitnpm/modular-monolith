@@ -40,6 +40,7 @@ func New(
 
 	r.Use(middleware.Logging(logger))
 	r.Use(middleware.Recovery(logger))
+	r.Use(middleware.Security(cfg.App.Env == "development"))
 
 	registerRoutes(
 		r,
