@@ -17,8 +17,6 @@ import (
 	"github.com/avijitnpm/modular-monolith/internal/platform/payments"
 )
 
-const defaultBaseURL = "https://test.dodopayments.com"
-
 type Provider struct {
 	APIKey        string
 	WebhookSecret string
@@ -43,12 +41,13 @@ type checkoutResponse struct {
 func NewProvider(
 	apiKey string,
 	webhookSecret string,
+	baseURL string,
 ) *Provider {
 
 	return &Provider{
 		APIKey:        strings.TrimSpace(apiKey),
 		WebhookSecret: strings.TrimSpace(webhookSecret),
-		BaseURL:       defaultBaseURL,
+		BaseURL:       strings.TrimSpace(baseURL),
 		HTTPClient: &http.Client{
 			Timeout: 10 * time.Second,
 		},

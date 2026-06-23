@@ -103,6 +103,7 @@ func registerRoutes(
 	billingProvider := dodo.NewProvider(
 		cfg.Payments.DodoAPIKey,
 		cfg.Payments.WebhookSecret,
+		cfg.Payments.DodoBaseURL,
 	)
 
 	billingService := billing.NewService(
@@ -134,7 +135,7 @@ func registerRoutes(
 		if cfg.App.Env == "development" {
 			api.Get(
 				"/token",
-				users.GenerateToken,
+				users.GenerateToken(cfg.Auth.DevTokenSecret),
 			)
 		}
 

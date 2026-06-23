@@ -12,7 +12,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-var jwtSecret = []byte("super-secret-development-key")
+
 
 var (
 	errMissingTokenKeyID  = errors.New("token missing key id")
@@ -48,6 +48,7 @@ func NewZitadelProvider(
 }
 
 func GenerateToken(
+	secret []byte,
 	userID string,
 	organizationID string,
 	email string,
@@ -70,7 +71,7 @@ func GenerateToken(
 		claims,
 	)
 
-	return token.SignedString(jwtSecret)
+	return token.SignedString(secret)
 }
 
 func (z *ZitadelProvider) ValidateToken(

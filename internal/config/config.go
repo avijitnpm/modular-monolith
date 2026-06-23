@@ -31,17 +31,17 @@ func Load() (*Config, error) {
 			URL: k.String("DATABASE_URL"),
 		},
 		Auth: AuthConfig{
-			ZitadelIssuer:   k.String("ZITADEL_ISSUER"),
-			ZitadelAPIURL:   k.String("ZITADEL_API_URL"),
 			OIDCIssuer:      k.String("OIDC_ISSUER"),
 			OIDCAudience:    k.String("OIDC_AUDIENCE"),
 			OIDCClientID:    k.String("OIDC_CLIENT_ID"),
 			OIDCRedirectURL: k.String("OIDC_REDIRECT_URL"),
 			SessionSecret:   k.String("SESSION_SECRET"),
+			DevTokenSecret:  k.String("DEV_TOKEN_SECRET"),
 		},
 		Payments: PaymentConfig{
 			DodoAPIKey:    k.String("DODO_API_KEY"),
 			WebhookSecret: k.String("DODO_WEBHOOK_SECRET"),
+			DodoBaseURL:   k.String("DODO_BASE_URL"),
 		},
 		OTEL: OTELConfig{
 			Enabled:     k.Bool("OTEL_ENABLED"),
@@ -56,6 +56,10 @@ func Load() (*Config, error) {
 
 	if cfg.OTEL.ServiceName == "" {
 		cfg.OTEL.ServiceName = cfg.App.Name
+	}
+
+	if cfg.Payments.DodoBaseURL == "" {
+		cfg.Payments.DodoBaseURL = "https://test.dodopayments.com"
 	}
 
 	err = validate(cfg)

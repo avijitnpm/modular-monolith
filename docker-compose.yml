@@ -20,8 +20,6 @@ services:
       APP_ENV: ${APP_ENV:-development}
       SERVER_PORT: ${SERVER_PORT:-8080}
       DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-app_db}?sslmode=disable
-      ZITADEL_ISSUER: ${ZITADEL_ISSUER:-http://localhost:8081}
-      ZITADEL_API_URL: ${ZITADEL_API_URL:-http://localhost:8081}
       DODO_API_KEY: ${DODO_API_KEY:-dev_key}
       DODO_WEBHOOK_SECRET: ${DODO_WEBHOOK_SECRET:-dev_secret}
       OTEL_ENABLED: ${OTEL_ENABLED:-true}

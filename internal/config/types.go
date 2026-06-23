@@ -29,18 +29,18 @@ type DatabaseConfig struct {
 }
 
 type AuthConfig struct {
-	ZitadelIssuer   string
-	ZitadelAPIURL   string
 	OIDCIssuer      string
 	OIDCAudience    string
 	OIDCClientID    string
 	OIDCRedirectURL string
 	SessionSecret   string
+	DevTokenSecret  string
 }
 
 type PaymentConfig struct {
 	DodoAPIKey    string
 	WebhookSecret string
+	DodoBaseURL   string
 }
 
 type OTELConfig struct {
