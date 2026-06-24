@@ -172,6 +172,7 @@ func (h *Handler) Callback(
 	state := r.URL.Query().Get("state")
 
 	if code == "" || state == "" {
+		h.logger.Info("callback step", "step", "missing_code_or_state")
 		response.BadRequest(
 			w,
 			"invalid auth callback",
@@ -186,6 +187,7 @@ func (h *Handler) Callback(
 	)
 
 	if err != nil || storedState != state {
+		h.logger.Info("callback step", "step", "state_mismatch")
 		response.BadRequest(
 			w,
 			"invalid auth callback",
@@ -200,6 +202,7 @@ func (h *Handler) Callback(
 	)
 
 	if err != nil {
+		h.logger.Info("callback step", "step", "missing_code_verifier")
 		response.BadRequest(
 			w,
 			"invalid auth callback",
@@ -214,6 +217,7 @@ func (h *Handler) Callback(
 	)
 
 	if err != nil {
+		h.logger.Info("callback step", "step", "missing_nonce")
 		response.BadRequest(
 			w,
 			"invalid auth callback",
@@ -229,6 +233,7 @@ func (h *Handler) Callback(
 	)
 
 	if err != nil {
+		h.logger.Info("callback step", "step", "token_exchange_failed", "error", err)
 		response.BadRequest(
 			w,
 			"invalid auth callback",
@@ -236,6 +241,8 @@ func (h *Handler) Callback(
 
 		return
 	}
+
+	h.logger.Info("callback step", "step", "token_exchange_success")
 
 	claims, err := h.tokenValidator.ValidateToken(
 		r.Context(),
@@ -243,6 +250,7 @@ func (h *Handler) Callback(
 	)
 
 	if err != nil {
+		h.logger.Info("callback step", "step", "id_token_validation_failed", "error", err)
 		response.BadRequest(
 			w,
 			"invalid auth callback",
@@ -251,7 +259,10 @@ func (h *Handler) Callback(
 		return
 	}
 
+	h.logger.Info("callback step", "step", "id_token_validated")
+
 	if claims.Nonce != nonce {
+		h.logger.Info("callback step", "step", "nonce_mismatch")
 		response.BadRequest(
 			w,
 			"invalid auth callback",
@@ -264,7 +275,15 @@ func (h *Handler) Callback(
 
 	user := normalizeUser(claims)
 
+	h.logger.Info("callback step", "step", "user_claims_extracted",
+		"subject", user.Subject,
+		"email", user.Email,
+		"organization_id", user.OrganizationID,
+	)
+
 	if h.userProvisioner != nil {
+		h.logger.Info("callback step", "step", "provisioning_started")
+
 		err = h.userProvisioner.ProvisionAuthenticatedUser(
 			r.Context(),
 			user.Subject,
@@ -273,6 +292,12 @@ func (h *Handler) Callback(
 		)
 
 		if err != nil {
+			h.logger.Error("user provisioning failed",
+				"error", err,
+				"subject", user.Subject,
+				"email", user.Email,
+				"organization_id", user.OrganizationID,
+			)
 			response.InternalServerError(
 				w,
 				"failed to provision user",
@@ -280,6 +305,8 @@ func (h *Handler) Callback(
 
 			return
 		}
+
+		h.logger.Info("callback step", "step", "provisioning_completed")
 	}
 
 	expiresAt := time.Now().Add(sessionTTL)
@@ -297,6 +324,7 @@ func (h *Handler) Callback(
 	)
 
 	if err != nil {
+		h.logger.Info("callback step", "step", "session_creation_failed", "error", err)
 		response.InternalServerError(
 			w,
 			"failed to create session",
@@ -317,6 +345,8 @@ func (h *Handler) Callback(
 		w,
 		codeVerifierCookieName,
 	)
+
+	h.logger.Info("callback step", "step", "login_complete")
 
 	http.Redirect(
 		w,
