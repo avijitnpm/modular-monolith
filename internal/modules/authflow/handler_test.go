@@ -3,6 +3,8 @@ package authflow
 import (
 	"context"
 	"errors"
+	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -202,7 +204,7 @@ func TestCallbackCreatesSessionAndMeReturnsUser(t *testing.T) {
 	}
 }
 
-func TestCallbackProvisionsAuthenticatedUser(t *testing.T) {
+func TestCallbackIdentityServiceCalled(t *testing.T) {
 	oauth := &mockOAuthProvider{
 		token: &identity.TokenResponse{
 			IDToken: "id-token",
@@ -212,6 +214,7 @@ func TestCallbackProvisionsAuthenticatedUser(t *testing.T) {
 		claims: &identity.Claims{
 			UserID:         "user-123",
 			Email:          "test@example.com",
+			Name:           "Test User",
 			OrganizationID: "org-123",
 			Nonce:          "nonce",
 			RegisteredClaims: jwt.RegisteredClaims{
@@ -221,12 +224,12 @@ func TestCallbackProvisionsAuthenticatedUser(t *testing.T) {
 			},
 		},
 	}
-	provisioner := &mockUserProvisioner{}
-	handler := newTestHandlerWithProvisioner(
+	idSvc := &mockIdentityService{}
+	handler := newTestHandlerWithIdentity(
 		t,
 		oauth,
 		validator,
-		provisioner,
+		idSvc,
 	)
 
 	req := httptest.NewRequest(
@@ -249,71 +252,20 @@ func TestCallbackProvisionsAuthenticatedUser(t *testing.T) {
 		t.Fatalf("expected redirect, got %d", rec.Code)
 	}
 
-	if provisioner.zitadelUserID != "user-123" {
-		t.Fatalf("expected provisioned user id, got %q", provisioner.zitadelUserID)
+	if idSvc.zitadelUserID != "user-123" {
+		t.Fatalf("expected identity user id, got %q", idSvc.zitadelUserID)
 	}
 
-	if provisioner.email != "test@example.com" {
-		t.Fatalf("expected provisioned email, got %q", provisioner.email)
+	if idSvc.email != "test@example.com" {
+		t.Fatalf("expected identity email, got %q", idSvc.email)
 	}
 
-	if provisioner.organizationID != "org-123" {
-		t.Fatalf("expected provisioned organization, got %q", provisioner.organizationID)
-	}
-}
-
-func TestCallbackPassesEmptyEmailToProvisioner(t *testing.T) {
-	oauth := &mockOAuthProvider{
-		token: &identity.TokenResponse{
-			IDToken: "id-token",
-		},
-	}
-	validator := &mockTokenValidator{
-		claims: &identity.Claims{
-			UserID:         "user-123",
-			OrganizationID: "org-123",
-			Nonce:          "nonce",
-			RegisteredClaims: jwt.RegisteredClaims{
-				ExpiresAt: jwt.NewNumericDate(
-					time.Now().Add(time.Hour),
-				),
-			},
-		},
-	}
-	provisioner := &mockUserProvisioner{}
-	handler := newTestHandlerWithProvisioner(
-		t,
-		oauth,
-		validator,
-		provisioner,
-	)
-
-	req := httptest.NewRequest(
-		http.MethodGet,
-		"/api/v1/auth/callback?code=abc&state=stored",
-		nil,
-	)
-	req.AddCookie(testCookie(stateCookieName, "stored"))
-	req.AddCookie(testCookie(nonceCookieName, "nonce"))
-	req.AddCookie(testCookie(codeVerifierCookieName, "verifier"))
-
-	rec := httptest.NewRecorder()
-
-	handler.Callback(
-		rec,
-		req,
-	)
-
-	if rec.Code != http.StatusFound {
-		t.Fatalf("expected redirect, got %d", rec.Code)
-	}
-
-	if provisioner.email != "" {
-		t.Fatalf("expected empty email to be passed through, got %q", provisioner.email)
+	if idSvc.name != "Test User" {
+		t.Fatalf("expected identity name, got %q", idSvc.name)
 	}
 }
 
-func TestCallbackRejectsProvisioningError(t *testing.T) {
+func TestCallbackRejectsIdentityServiceError(t *testing.T) {
 	oauth := &mockOAuthProvider{
 		token: &identity.TokenResponse{
 			IDToken: "id-token",
@@ -322,6 +274,7 @@ func TestCallbackRejectsProvisioningError(t *testing.T) {
 	validator := &mockTokenValidator{
 		claims: &identity.Claims{
 			UserID: "user-123",
+			Email:  "test@example.com",
 			Nonce:  "nonce",
 			RegisteredClaims: jwt.RegisteredClaims{
 				ExpiresAt: jwt.NewNumericDate(
@@ -330,12 +283,12 @@ func TestCallbackRejectsProvisioningError(t *testing.T) {
 			},
 		},
 	}
-	handler := newTestHandlerWithProvisioner(
+	handler := newTestHandlerWithIdentity(
 		t,
 		oauth,
 		validator,
-		&mockUserProvisioner{
-			err: errors.New("provision failed"),
+		&mockIdentityService{
+			err: errors.New("db error"),
 		},
 	)
 
@@ -361,8 +314,172 @@ func TestCallbackRejectsProvisioningError(t *testing.T) {
 
 	for _, cookie := range rec.Result().Cookies() {
 		if cookie.Name == sessionCookieName {
-			t.Fatal("expected no session cookie when provisioning fails")
+			t.Fatal("expected no session cookie when identity service fails")
 		}
+	}
+}
+
+func TestCallbackSucceedsWithoutOrganization(t *testing.T) {
+	oauth := &mockOAuthProvider{
+		token: &identity.TokenResponse{
+			IDToken: "id-token",
+		},
+	}
+	validator := &mockTokenValidator{
+		claims: &identity.Claims{
+			UserID: "user-new",
+			Email:  "new@example.com",
+			Name:   "New User",
+			Nonce:  "nonce",
+			RegisteredClaims: jwt.RegisteredClaims{
+				ExpiresAt: jwt.NewNumericDate(
+					time.Now().Add(time.Hour),
+				),
+			},
+		},
+	}
+	idSvc := &mockIdentityService{}
+	handler := newTestHandlerWithIdentity(
+		t,
+		oauth,
+		validator,
+		idSvc,
+	)
+
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/api/v1/auth/callback?code=abc&state=stored",
+		nil,
+	)
+	req.AddCookie(testCookie(stateCookieName, "stored"))
+	req.AddCookie(testCookie(nonceCookieName, "nonce"))
+	req.AddCookie(testCookie(codeVerifierCookieName, "verifier"))
+
+	rec := httptest.NewRecorder()
+
+	handler.Callback(
+		rec,
+		req,
+	)
+
+	if rec.Code != http.StatusFound {
+		t.Fatalf("expected redirect, got %d", rec.Code)
+	}
+
+	location := rec.Header().Get("Location")
+	if location != "/onboarding" {
+		t.Fatalf("expected redirect to /onboarding, got %q", location)
+	}
+
+	assertCookie(t, rec.Result(), sessionCookieName)
+}
+
+func TestCallbackRedirectsDashboardWithOrganization(t *testing.T) {
+	oauth := &mockOAuthProvider{
+		token: &identity.TokenResponse{
+			IDToken: "id-token",
+		},
+	}
+	validator := &mockTokenValidator{
+		claims: &identity.Claims{
+			UserID:         "user-123",
+			Email:          "test@example.com",
+			OrganizationID: "org-123",
+			Nonce:          "nonce",
+			RegisteredClaims: jwt.RegisteredClaims{
+				ExpiresAt: jwt.NewNumericDate(
+					time.Now().Add(time.Hour),
+				),
+			},
+		},
+	}
+	idSvc := &mockIdentityService{}
+	handler := newTestHandlerWithIdentity(
+		t,
+		oauth,
+		validator,
+		idSvc,
+	)
+
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/api/v1/auth/callback?code=abc&state=stored",
+		nil,
+	)
+	req.AddCookie(testCookie(stateCookieName, "stored"))
+	req.AddCookie(testCookie(nonceCookieName, "nonce"))
+	req.AddCookie(testCookie(codeVerifierCookieName, "verifier"))
+
+	rec := httptest.NewRecorder()
+
+	handler.Callback(
+		rec,
+		req,
+	)
+
+	if rec.Code != http.StatusFound {
+		t.Fatalf("expected redirect, got %d", rec.Code)
+	}
+
+	location := rec.Header().Get("Location")
+	if location != "/dashboard" {
+		t.Fatalf("expected redirect to /dashboard, got %q", location)
+	}
+}
+
+func TestCallbackUpdatesIdentityData(t *testing.T) {
+	oauth := &mockOAuthProvider{
+		token: &identity.TokenResponse{
+			IDToken: "id-token",
+		},
+	}
+	validator := &mockTokenValidator{
+		claims: &identity.Claims{
+			UserID: "user-123",
+			Email:  "newemail@example.com",
+			Name:   "Updated Name",
+			Nonce:  "nonce",
+			RegisteredClaims: jwt.RegisteredClaims{
+				ExpiresAt: jwt.NewNumericDate(
+					time.Now().Add(time.Hour),
+				),
+			},
+		},
+	}
+	idSvc := &mockIdentityService{}
+	handler := newTestHandlerWithIdentity(
+		t,
+		oauth,
+		validator,
+		idSvc,
+	)
+
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/api/v1/auth/callback?code=abc&state=stored",
+		nil,
+	)
+	req.AddCookie(testCookie(stateCookieName, "stored"))
+	req.AddCookie(testCookie(nonceCookieName, "nonce"))
+	req.AddCookie(testCookie(codeVerifierCookieName, "verifier"))
+
+	rec := httptest.NewRecorder()
+
+	handler.Callback(
+		rec,
+		req,
+	)
+
+	if rec.Code != http.StatusFound {
+		t.Fatalf("expected redirect, got %d", rec.Code)
+	}
+
+	if idSvc.email != "newemail@example.com" {
+		t.Fatalf("expected updated email passed to identity service, got %q", idSvc.email)
+	}
+
+	if idSvc.name != "Updated Name" {
+		t.Fatalf("expected updated name passed to identity service, got %q", idSvc.name)
 	}
 }
 
@@ -473,7 +590,7 @@ func newTestHandler(
 ) *Handler {
 	t.Helper()
 
-	return newTestHandlerWithProvisioner(
+	return newTestHandlerWithIdentity(
 		t,
 		oauth,
 		validator,
@@ -481,21 +598,21 @@ func newTestHandler(
 	)
 }
 
-func newTestHandlerWithProvisioner(
+func newTestHandlerWithIdentity(
 	t *testing.T,
 	oauth OAuthProvider,
 	validator identity.Provider,
-	provisioner UserProvisioner,
+	identitySvc IdentityService,
 ) *Handler {
 	t.Helper()
 
 	handler, err := NewHandler(
 		oauth,
 		validator,
-		provisioner,
+		identitySvc,
 		"01234567890123456789012345678901",
 		false,
-		nil,
+		slog.New(slog.NewTextHandler(io.Discard, nil)),
 		false,
 	)
 
@@ -580,23 +697,21 @@ func (m *mockTokenValidator) ValidateToken(
 	return m.claims, nil
 }
 
-type mockUserProvisioner struct {
-	zitadelUserID  string
-	email          string
-	organizationID string
-	err            error
+type mockIdentityService struct {
+	zitadelUserID string
+	email         string
+	name          string
+	err           error
 }
 
-func (m *mockUserProvisioner) ProvisionAuthenticatedUser(
+func (m *mockIdentityService) FindOrCreateIdentity(
 	ctx context.Context,
 	zitadelUserID string,
 	email string,
-	organizationID string,
+	name string,
 ) error {
-
 	m.zitadelUserID = zitadelUserID
 	m.email = email
-	m.organizationID = organizationID
-
+	m.name = name
 	return m.err
 }

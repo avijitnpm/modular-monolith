@@ -34,19 +34,19 @@ type OAuthProvider interface {
 	) (*identity.TokenResponse, error)
 }
 
-type UserProvisioner interface {
-	ProvisionAuthenticatedUser(
+type IdentityService interface {
+	FindOrCreateIdentity(
 		ctx context.Context,
 		zitadelUserID string,
 		email string,
-		organizationID string,
+		name string,
 	) error
 }
 
 type Handler struct {
 	oauth           OAuthProvider
 	tokenValidator  identity.Provider
-	userProvisioner UserProvisioner
+	identityService IdentityService
 	sessions        *sessionManager
 	logger          *slog.Logger
 	secureCookies   bool
@@ -58,7 +58,7 @@ var discoveredClaimKeysOnce sync.Once
 func NewHandler(
 	oauth OAuthProvider,
 	tokenValidator identity.Provider,
-	userProvisioner UserProvisioner,
+	identityService IdentityService,
 	sessionSecret string,
 	secureCookies bool,
 	logger *slog.Logger,
@@ -76,7 +76,7 @@ func NewHandler(
 	return &Handler{
 		oauth:           oauth,
 		tokenValidator:  tokenValidator,
-		userProvisioner: userProvisioner,
+		identityService: identityService,
 		sessions:        sessions,
 		logger:          logger,
 		secureCookies:   secureCookies,
@@ -281,32 +281,31 @@ func (h *Handler) Callback(
 		"organization_id", user.OrganizationID,
 	)
 
-	if h.userProvisioner != nil {
-		h.logger.Info("callback step", "step", "provisioning_started")
+	if h.identityService != nil {
+		h.logger.Info("callback step", "step", "identity_lookup_started")
 
-		err = h.userProvisioner.ProvisionAuthenticatedUser(
+		err = h.identityService.FindOrCreateIdentity(
 			r.Context(),
 			user.Subject,
 			user.Email,
-			user.OrganizationID,
+			user.Name,
 		)
 
 		if err != nil {
-			h.logger.Error("user provisioning failed",
+			h.logger.Error("identity lookup failed",
 				"error", err,
 				"subject", user.Subject,
 				"email", user.Email,
-				"organization_id", user.OrganizationID,
 			)
 			response.InternalServerError(
 				w,
-				"failed to provision user",
+				"failed to authenticate",
 			)
 
 			return
 		}
 
-		h.logger.Info("callback step", "step", "provisioning_completed")
+		h.logger.Info("callback step", "step", "identity_resolved")
 	}
 
 	expiresAt := time.Now().Add(sessionTTL)
@@ -346,12 +345,17 @@ func (h *Handler) Callback(
 		codeVerifierCookieName,
 	)
 
-	h.logger.Info("callback step", "step", "login_complete")
+	h.logger.Info("callback step", "step", "callback_success")
+
+	redirectURL := "/dashboard"
+	if user.OrganizationID == "" {
+		redirectURL = "/onboarding"
+	}
 
 	http.Redirect(
 		w,
 		r,
-		"/dashboard",
+		redirectURL,
 		http.StatusFound,
 	)
 }
@@ -424,6 +428,11 @@ func (h *Handler) Me(
 			"user":          session.User,
 		},
 	)
+}
+
+// GetSession returns the authenticated session from the request, or an error if not authenticated.
+func (h *Handler) GetSession(r *http.Request) (*Session, error) {
+	return h.sessions.get(r)
 }
 
 func (h *Handler) setOAuthCookie(
