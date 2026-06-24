@@ -19,6 +19,10 @@ import (
 	"github.com/avijitnpm/modular-monolith/internal/modules/billing"
 	"github.com/avijitnpm/modular-monolith/internal/modules/entitlements"
 	"github.com/avijitnpm/modular-monolith/internal/modules/health"
+	identitymod "github.com/avijitnpm/modular-monolith/internal/modules/identity"
+	"github.com/avijitnpm/modular-monolith/internal/modules/identityresolver"
+	"github.com/avijitnpm/modular-monolith/internal/modules/invitations"
+	"github.com/avijitnpm/modular-monolith/internal/modules/onboarding"
 	"github.com/avijitnpm/modular-monolith/internal/modules/organizations"
 	"github.com/avijitnpm/modular-monolith/internal/modules/rbac"
 	"github.com/avijitnpm/modular-monolith/internal/modules/usage"
@@ -58,10 +62,17 @@ func registerRoutes(
 		},
 	)
 
+	identityRepository := identitymod.NewRepository(service.Repository.DB)
+	identityService := identitymod.NewService(identityRepository)
+	identityResolver := identityresolver.NewIdentityResolver(service.Repository.DB)
+
+	membershipResolver := identityresolver.NewMembershipResolver(service.Repository.DB)
+
 	authHandler, err := authflow.NewHandler(
 		oauthProvider,
 		idTokenProvider,
-		service,
+		&identityServiceAdapter{svc: identityService},
+		&membershipCheckerAdapter{resolver: membershipResolver},
 		cfg.Auth.SessionSecret,
 		cfg.App.Env != "development",
 		logger,
@@ -146,6 +157,24 @@ func registerRoutes(
 		entitlementsService,
 	)
 
+	onboardingService := onboarding.NewService(
+		&onboardingOrgAdapter{svc: service},
+		&onboardingUserAdapter{svc: service},
+		&onboardingRoleAdapter{rbacRepo: rbacRepository},
+		&onboardingAuditAdapter{audit: auditService},
+		&onboardingIdentityChecker{db: service.Repository.DB},
+	)
+	onboardingHandler := onboarding.NewHandler(onboardingService, authHandler, identityResolver)
+
+	invitationsRepo := invitations.NewRepository(service.Repository.DB)
+	invitationsService := invitations.NewService(
+		invitationsRepo,
+		&onboardingUserAdapter{svc: service},
+		&invitationsRoleAdapter{rbacRepo: rbacRepository},
+		&invitationsAuditAdapter{audit: auditService},
+	)
+	invitationsHandler := invitations.NewHandler(invitationsService, authHandler, identityResolver)
+
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("ok"))
 	})
@@ -193,6 +222,22 @@ func registerRoutes(
 			"/organizations",
 			organizationHandler.CreateOrganization,
 		)
+
+		api.With(middleware.PublicRateLimit()).Post(
+			"/onboarding",
+			onboardingHandler.CompleteOnboarding,
+		)
+
+		api.With(middleware.PublicRateLimit()).Post(
+			"/invitations/accept",
+			invitationsHandler.AcceptInvitation,
+		)
+
+		// MEMBERSHIPS (session-authenticated, no tenant context needed)
+		membershipsHandler := identityresolver.NewMembershipsHandler(membershipResolver)
+		api.With(
+			middleware.SessionIdentityMiddleware(authHandler),
+		).Get("/memberships", membershipsHandler.ListMemberships)
 
 		// WEBHOOK (public, signature-verified)
 		api.With(middleware.WebhookRateLimit()).Post(
@@ -344,6 +389,11 @@ func registerRoutes(
 				"/organizations/usage-summary",
 				dashboardHandler.UsageSummary,
 			)
+
+			protected.Post(
+				"/invitations",
+				invitationsHandler.CreateInvitation,
+			)
 		})
 	})
 }
@@ -379,4 +429,133 @@ func (a *orgNameAdapter) GetOrganizationName(ctx context.Context, organizationID
 		return "", err
 	}
 	return name, nil
+}
+
+type identityServiceAdapter struct {
+	svc *identitymod.Service
+}
+
+func (a *identityServiceAdapter) FindOrCreateIdentity(ctx context.Context, zitadelUserID, email, name string) (string, error) {
+	identity, err := a.svc.FindOrCreateIdentity(ctx, zitadelUserID, email, name)
+	if err != nil {
+		return "", err
+	}
+	return identity.ID, nil
+}
+
+type onboardingOrgAdapter struct {
+	svc *service.Service
+}
+
+func (a *onboardingOrgAdapter) RegisterOrganization(ctx context.Context, orgID, name string) (string, error) {
+	org, err := a.svc.RegisterOrganization(ctx, orgID, name)
+	if err != nil {
+		return "", err
+	}
+	return org.OrganizationID, nil
+}
+
+type onboardingUserAdapter struct {
+	svc *service.Service
+}
+
+func (a *onboardingUserAdapter) CreateUser(ctx context.Context, organizationID, identityID, email string) (string, error) {
+	user, err := a.svc.RegisterMembership(ctx, organizationID, identityID, email)
+	if err != nil {
+		return "", err
+	}
+	return user.ID, nil
+}
+
+type onboardingRoleAdapter struct {
+	rbacRepo *rbac.Repository
+}
+
+func (a *onboardingRoleAdapter) AssignOwnerRole(ctx context.Context, organizationID, userID string) error {
+	roles, err := a.rbacRepo.ListRoles(ctx, organizationID)
+	if err != nil {
+		return err
+	}
+	for _, role := range roles {
+		if role.Name == "owner" {
+			_, err = a.rbacRepo.AssignRoleToUser(ctx, organizationID, userID, role.ID)
+			return err
+		}
+	}
+	return nil
+}
+
+type onboardingAuditAdapter struct {
+	audit *audit.Service
+}
+
+func (a *onboardingAuditAdapter) LogOnboarding(ctx context.Context, organizationID, userID string, metadata map[string]string) error {
+	return a.audit.Log(ctx, &audit.Event{
+		OrganizationID: organizationID,
+		UserID:         userID,
+		Action:         "onboarding_completed",
+		EntityType:     "organization",
+		EntityID:       organizationID,
+		Metadata:       metadata,
+	})
+}
+
+type onboardingIdentityChecker struct {
+	db *pgxpool.Pool
+}
+
+func (a *onboardingIdentityChecker) HasMembership(ctx context.Context, identityID string) (bool, error) {
+	var count int
+	err := a.db.QueryRow(ctx,
+		`SELECT COUNT(*) FROM users WHERE identity_id = $1`,
+		identityID,
+	).Scan(&count)
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
+type invitationsRoleAdapter struct {
+	rbacRepo *rbac.Repository
+}
+
+func (a *invitationsRoleAdapter) AssignRole(ctx context.Context, organizationID, userID, roleName string) error {
+	roles, err := a.rbacRepo.ListRoles(ctx, organizationID)
+	if err != nil {
+		return err
+	}
+	for _, role := range roles {
+		if role.Name == roleName {
+			_, err = a.rbacRepo.AssignRoleToUser(ctx, organizationID, userID, role.ID)
+			return err
+		}
+	}
+	return nil
+}
+
+type invitationsAuditAdapter struct {
+	audit *audit.Service
+}
+
+func (a *invitationsAuditAdapter) Log(ctx context.Context, organizationID, action, entityType, entityID string, metadata map[string]string) error {
+	return a.audit.Log(ctx, &audit.Event{
+		OrganizationID: organizationID,
+		Action:         action,
+		EntityType:     entityType,
+		EntityID:       entityID,
+		Metadata:       metadata,
+	})
+}
+
+type membershipCheckerAdapter struct {
+	resolver *identityresolver.DBMembershipResolver
+}
+
+func (a *membershipCheckerAdapter) HasMemberships(ctx context.Context, identityID string) (bool, error) {
+	memberships, err := a.resolver.ListMemberships(ctx, identityID)
+	if err != nil {
+		return false, err
+	}
+	return len(memberships) > 0, nil
 }

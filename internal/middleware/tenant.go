@@ -16,23 +16,26 @@ func TenantContext(
 		r *http.Request,
 	) {
 
-		user, ok := appcontext.GetAuthenticatedUser(
-			r.Context(),
-		)
+		// Prefer MembershipContext, fallback to AuthenticatedUser
+		var organizationID string
 
-		if !ok {
+		if m, ok := appcontext.GetMembership(r.Context()); ok && m.OrganizationID != "" {
+			organizationID = m.OrganizationID
+		} else if user, ok := appcontext.GetAuthenticatedUser(r.Context()); ok {
+			organizationID = user.OrganizationID
+		}
 
+		if organizationID == "" {
 			response.InternalServerError(
 				w,
-				"authenticated user missing",
+				"organization context missing",
 			)
-
 			return
 		}
 
 		ctx := appcontext.SetOrganizationID(
 			r.Context(),
-			user.OrganizationID,
+			organizationID,
 		)
 
 		next.ServeHTTP(

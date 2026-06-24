@@ -12,7 +12,7 @@ type PermissionChecker interface {
 	UserHasPermission(
 		ctx context.Context,
 		organizationID string,
-		zitadelUserID string,
+		membershipID string,
 		permission string,
 	) (bool, error)
 }
@@ -31,19 +31,6 @@ func RequirePermission(
 			r *http.Request,
 		) {
 
-			authenticatedUser, ok := appcontext.GetAuthenticatedUser(
-				r.Context(),
-			)
-
-			if !ok {
-				response.InternalServerError(
-					w,
-					"authenticated user missing",
-				)
-
-				return
-			}
-
 			organizationID, ok := appcontext.GetOrganizationID(
 				r.Context(),
 			)
@@ -57,10 +44,26 @@ func RequirePermission(
 				return
 			}
 
+			// Prefer MembershipContext, fallback to AuthenticatedUser.UserID
+			var membershipID string
+			if m, ok := appcontext.GetMembership(r.Context()); ok && m.MembershipID != "" {
+				membershipID = m.MembershipID
+			} else if user, ok := appcontext.GetAuthenticatedUser(r.Context()); ok {
+				membershipID = user.UserID
+			}
+
+			if membershipID == "" {
+				response.InternalServerError(
+					w,
+					"user context missing",
+				)
+				return
+			}
+
 			allowed, err := service.UserHasPermission(
 				r.Context(),
 				organizationID,
-				authenticatedUser.UserID,
+				membershipID,
 				permission,
 			)
 

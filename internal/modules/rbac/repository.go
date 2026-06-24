@@ -303,7 +303,7 @@ func (r *Repository) RemoveRoleFromUser(
 func (r *Repository) UserHasPermission(
 	ctx context.Context,
 	organizationID string,
-	zitadelUserID string,
+	membershipID string,
 	permission string,
 ) (bool, error) {
 
@@ -325,12 +325,12 @@ func (r *Repository) UserHasPermission(
 					JOIN permissions p
 						ON p.id = rp.permission_id
 					WHERE u.organization_id = $1
-						AND u.zitadel_user_id = $2
+						AND u.id = $2
 						AND p.name = $3
 				)
 			`,
 			organizationID,
-			zitadelUserID,
+			membershipID,
 			permission,
 		).Scan(
 			&exists,

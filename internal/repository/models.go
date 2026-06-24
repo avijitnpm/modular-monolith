@@ -5,6 +5,7 @@ import "time"
 type User struct {
 	ID string
 
+	IdentityID     string
 	ZitadelUserID  string
 	OrganizationID string
 	Email          string

@@ -34,23 +34,28 @@ type OAuthProvider interface {
 	) (*identity.TokenResponse, error)
 }
 
-type UserProvisioner interface {
-	ProvisionAuthenticatedUser(
+type IdentityService interface {
+	FindOrCreateIdentity(
 		ctx context.Context,
 		zitadelUserID string,
 		email string,
-		organizationID string,
-	) error
+		name string,
+	) (string, error) // returns identityID
+}
+
+type MembershipChecker interface {
+	HasMemberships(ctx context.Context, identityID string) (bool, error)
 }
 
 type Handler struct {
-	oauth           OAuthProvider
-	tokenValidator  identity.Provider
-	userProvisioner UserProvisioner
-	sessions        *sessionManager
-	logger          *slog.Logger
-	secureCookies   bool
-	logClaimKeys    bool
+	oauth             OAuthProvider
+	tokenValidator    identity.Provider
+	identityService   IdentityService
+	membershipChecker MembershipChecker
+	sessions          *sessionManager
+	logger            *slog.Logger
+	secureCookies     bool
+	logClaimKeys      bool
 }
 
 var discoveredClaimKeysOnce sync.Once
@@ -58,7 +63,8 @@ var discoveredClaimKeysOnce sync.Once
 func NewHandler(
 	oauth OAuthProvider,
 	tokenValidator identity.Provider,
-	userProvisioner UserProvisioner,
+	identityService IdentityService,
+	membershipChecker MembershipChecker,
 	sessionSecret string,
 	secureCookies bool,
 	logger *slog.Logger,
@@ -74,13 +80,14 @@ func NewHandler(
 	}
 
 	return &Handler{
-		oauth:           oauth,
-		tokenValidator:  tokenValidator,
-		userProvisioner: userProvisioner,
-		sessions:        sessions,
-		logger:          logger,
-		secureCookies:   secureCookies,
-		logClaimKeys:    logClaimKeys,
+		oauth:             oauth,
+		tokenValidator:    tokenValidator,
+		identityService:   identityService,
+		membershipChecker: membershipChecker,
+		sessions:          sessions,
+		logger:            logger,
+		secureCookies:     secureCookies,
+		logClaimKeys:      logClaimKeys,
 	}, nil
 }
 
@@ -281,32 +288,32 @@ func (h *Handler) Callback(
 		"organization_id", user.OrganizationID,
 	)
 
-	if h.userProvisioner != nil {
-		h.logger.Info("callback step", "step", "provisioning_started")
+	if h.identityService != nil {
+		h.logger.Info("callback step", "step", "identity_lookup_started")
 
-		err = h.userProvisioner.ProvisionAuthenticatedUser(
+		identityID, err := h.identityService.FindOrCreateIdentity(
 			r.Context(),
 			user.Subject,
 			user.Email,
-			user.OrganizationID,
+			user.Name,
 		)
 
 		if err != nil {
-			h.logger.Error("user provisioning failed",
+			h.logger.Error("identity lookup failed",
 				"error", err,
 				"subject", user.Subject,
 				"email", user.Email,
-				"organization_id", user.OrganizationID,
 			)
 			response.InternalServerError(
 				w,
-				"failed to provision user",
+				"failed to authenticate",
 			)
 
 			return
 		}
 
-		h.logger.Info("callback step", "step", "provisioning_completed")
+		user.IdentityID = identityID
+		h.logger.Info("callback step", "step", "identity_resolved", "identity_id", identityID)
 	}
 
 	expiresAt := time.Now().Add(sessionTTL)
@@ -346,12 +353,24 @@ func (h *Handler) Callback(
 		codeVerifierCookieName,
 	)
 
-	h.logger.Info("callback step", "step", "login_complete")
+	h.logger.Info("callback step", "step", "callback_success")
+
+	// Route based on membership existence, not token claims
+	redirectURL := "/dashboard"
+	if h.membershipChecker != nil && user.IdentityID != "" {
+		hasMemberships, err := h.membershipChecker.HasMemberships(r.Context(), user.IdentityID)
+		if err == nil && !hasMemberships {
+			redirectURL = "/onboarding"
+		}
+	} else if user.OrganizationID == "" {
+		// Legacy fallback: no membership checker configured
+		redirectURL = "/onboarding"
+	}
 
 	http.Redirect(
 		w,
 		r,
-		"/dashboard",
+		redirectURL,
 		http.StatusFound,
 	)
 }
@@ -424,6 +443,11 @@ func (h *Handler) Me(
 			"user":          session.User,
 		},
 	)
+}
+
+// GetSession returns the authenticated session from the request, or an error if not authenticated.
+func (h *Handler) GetSession(r *http.Request) (*Session, error) {
+	return h.sessions.get(r)
 }
 
 func (h *Handler) setOAuthCookie(

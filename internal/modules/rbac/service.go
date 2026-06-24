@@ -35,7 +35,7 @@ type Store interface {
 	UserHasPermission(
 		ctx context.Context,
 		organizationID string,
-		zitadelUserID string,
+		membershipID string,
 		permission string,
 	) (bool, error)
 }
@@ -205,14 +205,14 @@ func (s *Service) RemoveRoleFromUser(
 func (s *Service) UserHasPermission(
 	ctx context.Context,
 	organizationID string,
-	zitadelUserID string,
+	membershipID string,
 	permission string,
 ) (bool, error) {
 
 	return s.Repository.UserHasPermission(
 		ctx,
 		organizationID,
-		zitadelUserID,
+		membershipID,
 		permission,
 	)
 }
