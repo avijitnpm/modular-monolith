@@ -1,42 +1,32 @@
-FROM golang:1.24-alpine AS builder
+# syntax=docker/dockerfile:1
+
+# Build stage
+FROM golang:1.25-alpine AS builder
 
 WORKDIR /src
 
-RUN apk add --no-cache git ca-certificates
-
-ARG HTTP_PROXY
-ARG HTTPS_PROXY
-ARG NO_PROXY
-ARG http_proxy
-ARG https_proxy
-ARG no_proxy
-ARG GOPROXY
-
-ENV HTTP_PROXY=${HTTP_PROXY} \
-    HTTPS_PROXY=${HTTPS_PROXY} \
-    NO_PROXY=${NO_PROXY} \
-    http_proxy=${http_proxy} \
-    https_proxy=${https_proxy} \
-    no_proxy=${no_proxy} \
-    GOPROXY=${GOPROXY:-https://proxy.golang.org,direct}
-
 COPY go.mod go.sum ./
-ENV GOPROXY=https://proxy.golang.org,direct
-
 RUN go mod download
 
 COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/server ./cmd/server
 
-FROM alpine:3.21
+# Runtime stage
+FROM alpine:3.21.3
 
-RUN apk add --no-cache wget ca-certificates
+RUN addgroup -g 10001 -S appgroup \
+    && adduser -u 10001 -S appuser -G appgroup -h /app -s /sbin/nologin
 
 WORKDIR /app
 
-COPY --from=builder /out/server /app/server
-COPY migrations/ /app/migrations/
+COPY --from=builder --chown=10001:10001 /out/server /app/server
+COPY --chown=10001:10001 migrations/ /app/migrations/
+
+USER 10001:10001
 
 EXPOSE 8080
+
+HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=3 \
+    CMD wget -qO- http://127.0.0.1:8080/health/live || exit 1
 
 ENTRYPOINT ["/app/server"]

@@ -7,6 +7,7 @@ import (
 
 func Load() (*Config, error) {
 	loadEnvFile()
+	loadSecrets()
 
 	k := koanf.New(".")
 

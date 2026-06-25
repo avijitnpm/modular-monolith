@@ -1,12 +1,10 @@
-# Traefik v3 Static Configuration
+# Traefik v3 Static Configuration — Production
 # ACME email is passed via CLI args in docker-compose.yml
 
-# --- API / Dashboard ---
 api:
   dashboard: true
   insecure: false
 
-# --- Entrypoints ---
 entryPoints:
   web:
     address: ":80"
@@ -24,7 +22,6 @@ entryPoints:
         writeTimeout: 30s
         idleTimeout: 120s
 
-# --- Certificate Resolvers ---
 certificatesResolvers:
   letsencrypt:
     acme:
@@ -38,14 +35,12 @@ certificatesResolvers:
       httpChallenge:
         entryPoint: web
 
-# --- Providers ---
 providers:
   docker:
     endpoint: "unix:///var/run/docker.sock"
     exposedByDefault: false
-    network: modular-monolith_monolith_internal
+    network: modular-monolith-prod_internal
 
-# --- Logging ---
 log:
   level: WARN
 

@@ -8,12 +8,14 @@ bin
 build
 dist
 tmp
+server
 coverage.out
 .air
 
 frontend/node_modules
 frontend/.svelte-kit
-frontend/build
-frontend/dist
+frontend-backup
 
 deployments/docker/.env
+docs/
+*.md
