@@ -6,8 +6,8 @@ import (
 	"errors"
 	"net/http"
 
-	appErrors "github.com/avijitnpm/modular-monolith/pkg/errors"
 	"github.com/avijitnpm/modular-monolith/internal/repository"
+	appErrors "github.com/avijitnpm/modular-monolith/pkg/errors"
 	"github.com/avijitnpm/modular-monolith/pkg/response"
 )
 

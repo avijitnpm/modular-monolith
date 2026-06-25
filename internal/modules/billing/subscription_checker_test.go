@@ -34,10 +34,10 @@ func (m *mockStore) UpsertSubscriptionByProvider(ctx context.Context, organizati
 
 func TestHasActiveSubscription(t *testing.T) {
 	tests := []struct {
-		name   string
-		sub    *Subscription
-		err    error
-		want   bool
+		name    string
+		sub     *Subscription
+		err     error
+		want    bool
 		wantErr bool
 	}{
 		{"active", &Subscription{Status: "active"}, nil, true, false},

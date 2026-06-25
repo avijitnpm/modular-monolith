@@ -8,20 +8,20 @@ import (
 )
 
 type SessionUser struct {
-	Subject           string         `json:"subject"`
-	IdentityID        string         `json:"identity_id,omitempty"`
-	Email             string         `json:"email,omitempty"`
-	EmailVerified     bool           `json:"email_verified,omitempty"`
-	PreferredUsername string         `json:"preferred_username,omitempty"`
-	Name              string         `json:"name,omitempty"`
-	GivenName         string         `json:"given_name,omitempty"`
-	FamilyName        string         `json:"family_name,omitempty"`
-	Locale            string         `json:"locale,omitempty"`
+	Subject           string `json:"subject"`
+	IdentityID        string `json:"identity_id,omitempty"`
+	Email             string `json:"email,omitempty"`
+	EmailVerified     bool   `json:"email_verified,omitempty"`
+	PreferredUsername string `json:"preferred_username,omitempty"`
+	Name              string `json:"name,omitempty"`
+	GivenName         string `json:"given_name,omitempty"`
+	FamilyName        string `json:"family_name,omitempty"`
+	Locale            string `json:"locale,omitempty"`
 	// OrganizationID is legacy. Populated from OIDC claims but no longer
 	// drives routing or authorization. New code should not depend on this field.
 	OrganizationID string         `json:"organization_id,omitempty"`
 	Roles          []string       `json:"roles,omitempty"`
-	RawClaims         map[string]any `json:"raw_claims,omitempty"`
+	RawClaims      map[string]any `json:"raw_claims,omitempty"`
 }
 
 func normalizeUser(

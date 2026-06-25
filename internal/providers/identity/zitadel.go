@@ -12,8 +12,6 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-
-
 var (
 	errMissingTokenKeyID  = errors.New("token missing key id")
 	errOIDCIssuerMismatch = errors.New("oidc issuer mismatch")
