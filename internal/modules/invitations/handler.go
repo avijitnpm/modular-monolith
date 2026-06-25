@@ -5,9 +5,10 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/avijitnpm/modular-monolith/internal/modules/authflow"
 	appctx "github.com/avijitnpm/modular-monolith/internal/context"
+	"github.com/avijitnpm/modular-monolith/internal/modules/authflow"
 	"github.com/avijitnpm/modular-monolith/internal/modules/identityresolver"
+	appErrors "github.com/avijitnpm/modular-monolith/pkg/errors"
 	"github.com/avijitnpm/modular-monolith/pkg/response"
 )
 
@@ -96,6 +97,8 @@ func (h *Handler) AcceptInvitation(w http.ResponseWriter, r *http.Request) {
 		case errors.Is(err, ErrEmailMismatch):
 			response.Error(w, http.StatusForbidden, "email does not match invitation")
 		case errors.Is(err, ErrAlreadyAccepted):
+			response.Error(w, http.StatusConflict, "invitation already accepted")
+		case errors.Is(err, appErrors.ErrUserAlreadyExists):
 			response.Error(w, http.StatusConflict, "invitation already accepted")
 		default:
 			response.InternalServerError(w, "failed to accept invitation")

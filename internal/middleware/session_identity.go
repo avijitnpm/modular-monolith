@@ -5,11 +5,11 @@ import (
 
 	appcontext "github.com/avijitnpm/modular-monolith/internal/context"
 	"github.com/avijitnpm/modular-monolith/internal/modules/authflow"
+	"github.com/avijitnpm/modular-monolith/pkg/response"
 )
 
 // SessionIdentityMiddleware loads IdentityContext directly from the session cookie.
-// This avoids a DB lookup for identity resolution when the session already contains
-// the identity_id.
+// For protected routes it enforces authentication — returns 401 if no valid session.
 func SessionIdentityMiddleware(
 	authHandler *authflow.Handler,
 ) func(http.Handler) http.Handler {
@@ -18,14 +18,17 @@ func SessionIdentityMiddleware(
 			ctx := r.Context()
 
 			session, err := authHandler.GetSession(r)
-			if err == nil && session.User.IdentityID != "" {
-				ctx = appcontext.SetIdentity(ctx, &appcontext.Identity{
-					IdentityID: session.User.IdentityID,
-					ProviderID: session.User.Subject,
-					Email:      session.User.Email,
-					Name:       session.User.Name,
-				})
+			if err != nil || session.User.IdentityID == "" {
+				response.Error(w, http.StatusUnauthorized, "not authenticated")
+				return
 			}
+
+			ctx = appcontext.SetIdentity(ctx, &appcontext.Identity{
+				IdentityID: session.User.IdentityID,
+				ProviderID: session.User.Subject,
+				Email:      session.User.Email,
+				Name:       session.User.Name,
+			})
 
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})

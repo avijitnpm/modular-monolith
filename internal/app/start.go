@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/avijitnpm/modular-monolith/internal/audit"
@@ -51,6 +52,16 @@ func New() (*App, error) {
 			)
 		}
 
+		return nil, err
+	}
+
+	// Run migrations on startup
+	migrationsDir := "migrations"
+	if _, err := os.Stat(migrationsDir); os.IsNotExist(err) {
+		migrationsDir = "/app/migrations"
+	}
+	if err := database.Migrate(db, migrationsDir, log); err != nil {
+		log.Error("migration failed", "error", err)
 		return nil, err
 	}
 

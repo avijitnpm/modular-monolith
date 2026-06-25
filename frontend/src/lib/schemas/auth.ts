@@ -2,6 +2,7 @@ import { z } from 'zod/v4';
 
 export const UserSchema = z.object({
 	subject: z.string(),
+	identity_id: z.string().optional(),
 	email: z.string().optional(),
 	email_verified: z.boolean().optional(),
 	preferred_username: z.string().optional(),

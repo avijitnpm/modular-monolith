@@ -10,7 +10,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/avijitnpm/modular-monolith/internal/audit"
-	"github.com/avijitnpm/modular-monolith/internal/auth"
 	"github.com/avijitnpm/modular-monolith/internal/config"
 	"github.com/avijitnpm/modular-monolith/internal/database"
 	"github.com/avijitnpm/modular-monolith/internal/middleware"
@@ -38,13 +37,6 @@ func registerRoutes(
 	logger *slog.Logger,
 	service *service.Service,
 ) {
-
-	apiTokenProvider := identity.NewZitadelProvider(
-		identity.OIDCConfig{
-			Issuer:   cfg.Auth.OIDCIssuer,
-			Audience: cfg.Auth.OIDCAudience,
-		},
-	)
 
 	oauthProvider := identity.NewZitadelProvider(
 		identity.OIDCConfig{
@@ -164,6 +156,7 @@ func registerRoutes(
 		&onboardingAuditAdapter{audit: auditService},
 		&onboardingIdentityChecker{db: service.Repository.DB},
 	)
+	onboardingService.UsersWithRole = &onboardingUserWithRoleAdapter{svc: service}
 	onboardingHandler := onboarding.NewHandler(onboardingService, authHandler, identityResolver)
 
 	invitationsRepo := invitations.NewRepository(service.Repository.DB)
@@ -173,6 +166,7 @@ func registerRoutes(
 		&invitationsRoleAdapter{rbacRepo: rbacRepository},
 		&invitationsAuditAdapter{audit: auditService},
 	)
+	invitationsService.UsersWithRole = &onboardingUserWithRoleAdapter{svc: service}
 	invitationsHandler := invitations.NewHandler(invitationsService, authHandler, identityResolver)
 
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -245,12 +239,16 @@ func registerRoutes(
 			billingHandler.HandleWebhook,
 		)
 
-		// PROTECTED ROUTES
+		// PROTECTED ROUTES (session-authenticated with identity/membership resolution)
 
 		api.Group(func(protected chi.Router) {
 
 			protected.Use(
-				auth.Middleware(apiTokenProvider),
+				middleware.SessionIdentityMiddleware(authHandler),
+			)
+
+			protected.Use(
+				middleware.ResolveMembershipMiddleware(membershipResolver),
 			)
 
 			protected.Use(
@@ -467,11 +465,28 @@ func (a *onboardingUserAdapter) CreateUser(ctx context.Context, organizationID, 
 	return user.ID, nil
 }
 
+type onboardingUserWithRoleAdapter struct {
+	svc *service.Service
+}
+
+func (a *onboardingUserWithRoleAdapter) CreateUserWithRole(ctx context.Context, organizationID, identityID, email, roleName string) (string, error) {
+	user, err := a.svc.RegisterMembershipWithRole(ctx, organizationID, identityID, email, roleName)
+	if err != nil {
+		return "", err
+	}
+	return user.ID, nil
+}
+
 type onboardingRoleAdapter struct {
 	rbacRepo *rbac.Repository
 }
 
 func (a *onboardingRoleAdapter) AssignOwnerRole(ctx context.Context, organizationID, userID string) error {
+	// Bootstrap default roles for the new organization first
+	if err := a.rbacRepo.BootstrapDefaultRoles(ctx, organizationID); err != nil {
+		return err
+	}
+
 	roles, err := a.rbacRepo.ListRoles(ctx, organizationID)
 	if err != nil {
 		return err

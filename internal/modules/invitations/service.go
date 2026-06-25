@@ -3,6 +3,7 @@ package invitations
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 )
 
@@ -28,6 +29,10 @@ type UserCreator interface {
 	CreateUser(ctx context.Context, organizationID, identityID, email string) (string, error)
 }
 
+type UserCreatorWithRole interface {
+	CreateUserWithRole(ctx context.Context, organizationID, identityID, email, roleName string) (string, error)
+}
+
 type RoleAssigner interface {
 	AssignRole(ctx context.Context, organizationID, userID, roleName string) error
 }
@@ -37,10 +42,11 @@ type AuditLogger interface {
 }
 
 type Service struct {
-	Store  Store
-	Users  UserCreator
-	Roles  RoleAssigner
-	Audit  AuditLogger
+	Store         Store
+	Users         UserCreator
+	UsersWithRole UserCreatorWithRole // Atomic user+role creation (preferred)
+	Roles         RoleAssigner
+	Audit         AuditLogger
 }
 
 func NewService(store Store, users UserCreator, roles RoleAssigner, audit AuditLogger) *Service {
@@ -82,17 +88,25 @@ func (s *Service) AcceptInvitation(ctx context.Context, token, identityID, email
 		return nil, ErrEmailMismatch
 	}
 
-	userID, err := s.Users.CreateUser(ctx, inv.OrganizationID, identityID, email)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := s.Roles.AssignRole(ctx, inv.OrganizationID, userID, inv.RoleName); err != nil {
-		return nil, err
+	// Create user + assign role (atomic when UsersWithRole is available)
+	var userID string
+	if s.UsersWithRole != nil {
+		userID, err = s.UsersWithRole.CreateUserWithRole(ctx, inv.OrganizationID, identityID, email, inv.RoleName)
+		if err != nil {
+			return nil, fmt.Errorf("accept invitation: create user with role: %w", err)
+		}
+	} else {
+		userID, err = s.Users.CreateUser(ctx, inv.OrganizationID, identityID, email)
+		if err != nil {
+			return nil, fmt.Errorf("accept invitation: create user: %w", err)
+		}
+		if err := s.Roles.AssignRole(ctx, inv.OrganizationID, userID, inv.RoleName); err != nil {
+			return nil, fmt.Errorf("accept invitation: assign role (user %s created): %w", userID, err)
+		}
 	}
 
 	if err := s.Store.MarkAccepted(ctx, token); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("accept invitation: mark accepted (user %s, role assigned): %w", userID, err)
 	}
 
 	if s.Audit != nil {

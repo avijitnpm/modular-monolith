@@ -20,6 +20,13 @@ services:
       APP_ENV: ${APP_ENV:-development}
       SERVER_PORT: ${SERVER_PORT:-8080}
       DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-app_db}?sslmode=disable
+      OIDC_ISSUER: ${OIDC_ISSUER:-http://localhost:8080}
+      OIDC_AUDIENCE: ${OIDC_AUDIENCE:-modular-monolith}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-modular-monolith}
+      OIDC_REDIRECT_URL: ${OIDC_REDIRECT_URL:-http://localhost/api/v1/auth/callback}
+      SESSION_SECRET: ${SESSION_SECRET:-change-me-to-at-least-32-random-characters}
+      DEV_TOKEN_SECRET: ${DEV_TOKEN_SECRET:-dev-signing-key-for-local-development}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost}
       DODO_API_KEY: ${DODO_API_KEY:-dev_key}
       DODO_WEBHOOK_SECRET: ${DODO_WEBHOOK_SECRET:-dev_secret}
       OTEL_ENABLED: ${OTEL_ENABLED:-true}

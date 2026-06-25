@@ -37,3 +37,21 @@ func (s *Service) RegisterMembership(
 		email,
 	)
 }
+
+// RegisterMembershipWithRole atomically creates a membership and assigns a role.
+func (s *Service) RegisterMembershipWithRole(
+	ctx context.Context,
+	organizationID string,
+	identityID string,
+	email string,
+	roleName string,
+) (*repository.User, error) {
+
+	return s.Repository.CreateMembershipWithRole(
+		ctx,
+		organizationID,
+		identityID,
+		email,
+		roleName,
+	)
+}

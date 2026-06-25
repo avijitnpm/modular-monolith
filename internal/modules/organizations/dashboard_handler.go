@@ -111,12 +111,12 @@ func (h *DashboardHandler) getUsage(ctx context.Context, orgID string) Dashboard
 }
 
 func toEntitlementItems(ents []entitlements.Entitlement) []DashboardEntitlement {
-	items := make([]DashboardEntitlement, len(ents))
-	for i, e := range ents {
-		items[i] = DashboardEntitlement{
+	items := make([]DashboardEntitlement, 0, len(ents))
+	for _, e := range ents {
+		items = append(items, DashboardEntitlement{
 			Metric: e.Metric, Used: e.Used, Limit: e.Limit,
 			Remaining: e.Remaining, Allowed: e.Allowed,
-		}
+		})
 	}
 	return items
 }

@@ -177,3 +177,58 @@ func (r *Repository) CreateMembership(
 
 	return &user, nil
 }
+
+// CreateMembershipWithRole atomically creates a membership and assigns a role in a single transaction.
+func (r *Repository) CreateMembershipWithRole(
+	ctx context.Context,
+	organizationID string,
+	identityID string,
+	email string,
+	roleName string,
+) (*User, error) {
+
+	var user User
+
+	err := database.WithTenantQuery(r.DB, ctx, organizationID, func(tx pgx.Tx) error {
+		err := tx.QueryRow(
+			ctx,
+			`INSERT INTO users (organization_id, identity_id, zitadel_user_id, email)
+			 VALUES ($1, $2, (SELECT zitadel_user_id FROM identities WHERE id = $2), $3)
+			 RETURNING id, identity_id, zitadel_user_id, organization_id, email, created_at, updated_at`,
+			organizationID,
+			identityID,
+			email,
+		).Scan(
+			&user.ID,
+			&user.IdentityID,
+			&user.ZitadelUserID,
+			&user.OrganizationID,
+			&user.Email,
+			&user.CreatedAt,
+			&user.UpdatedAt,
+		)
+		if err != nil {
+			return err
+		}
+
+		// Assign role within the same transaction
+		_, err = tx.Exec(ctx,
+			`INSERT INTO user_roles (organization_id, user_id, role_id)
+			 SELECT $1, $2, r.id FROM roles r
+			 WHERE r.organization_id = $1 AND r.name = $3
+			 ON CONFLICT (organization_id, user_id, role_id) DO NOTHING`,
+			organizationID, user.ID, roleName,
+		)
+		return err
+	})
+
+	if err != nil {
+		pgErr, ok := err.(*pgconn.PgError)
+		if ok && pgErr.Code == appErrors.PostgresUniqueViolation {
+			return nil, appErrors.ErrUserAlreadyExists
+		}
+		return nil, err
+	}
+
+	return &user, nil
+}

@@ -1,4 +1,4 @@
-FROM golang:1.26-alpine AS builder
+FROM golang:1.24-alpine AS builder
 
 WORKDIR /src
 
@@ -28,11 +28,14 @@ RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/server ./cmd/server
 
-FROM alpine:3.22
+FROM alpine:3.21
+
+RUN apk add --no-cache wget ca-certificates
 
 WORKDIR /app
 
 COPY --from=builder /out/server /app/server
+COPY migrations/ /app/migrations/
 
 EXPOSE 8080
 
