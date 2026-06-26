@@ -60,7 +60,7 @@ The Dockerfile is fully self-contained with multi-stage build (Node.js â†’ Go â†
 | `docker-build` | Build Docker image |
 | `docker-up` | Start all services |
 | `docker-down` | Stop all services |
-| `migrate` | Run tern migrations (local dev only) |
+| `migrate` | Show migration info (auto-runs on startup) |
 
 ## Architecture Notes
 

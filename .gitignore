@@ -6,3 +6,5 @@ tmp
 vendor
 .air
 coverage.out
+bin/
+server
