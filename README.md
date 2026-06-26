@@ -20,8 +20,11 @@ Migrations run automatically on app startup.
 ### Verify
 
 ```bash
-# App health
+# App health (direct — bypasses Traefik)
 curl http://localhost:8080/health/ready
+
+# App health (via Traefik HTTPS — uses self-signed cert in dev)
+curl -k https://localhost/health/live
 
 # Postgres
 docker compose exec postgres pg_isready
