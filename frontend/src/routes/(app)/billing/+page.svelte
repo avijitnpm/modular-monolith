@@ -27,7 +27,7 @@
 			[subscription, usage, entitlements] = await Promise.all([
 				billingApi.getSubscription(),
 				billingApi.getUsage(),
-				billingApi.getEntitlements(),
+				billingApi.getEntitlements()
 			]);
 		} catch (err) {
 			if (isApiError(err) && err.status === 403) {
@@ -50,7 +50,10 @@
 {:else if error}
 	<ErrorState message={error} onRetry={load} />
 {:else if !subscription}
-	<EmptyState title="No subscription" description="No active subscription found for this organization." />
+	<EmptyState
+		title="No subscription"
+		description="No active subscription found for this organization."
+	/>
 {:else}
 	<div class="space-y-6">
 		<PageHeader title="Billing" description="Subscription, usage, and plan limits." />

@@ -33,7 +33,7 @@
 				</tr>
 			</thead>
 			<tbody>
-				{#each entitlements as ent}
+				{#each entitlements as ent (ent.metric)}
 					<tr class="border-t">
 						<td class="px-4 py-2 capitalize">{ent.metric.replace(/_/g, ' ')}</td>
 						<td class="px-4 py-2">{ent.used.toLocaleString()}</td>
@@ -41,9 +41,15 @@
 						<td class="px-4 py-2">{formatRemaining(ent.remaining, ent.limit)}</td>
 						<td class="px-4 py-2">
 							{#if ent.allowed}
-								<span class="inline-block rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">Available</span>
+								<span
+									class="inline-block rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800"
+									>Available</span
+								>
 							{:else}
-								<span class="inline-block rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800">Limit Reached</span>
+								<span
+									class="inline-block rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800"
+									>Limit Reached</span
+								>
 							{/if}
 						</td>
 					</tr>

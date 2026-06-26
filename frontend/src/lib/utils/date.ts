@@ -1,7 +1,7 @@
 const dateFormatter = new Intl.DateTimeFormat('en-US', {
 	year: 'numeric',
 	month: 'short',
-	day: 'numeric',
+	day: 'numeric'
 });
 
 const dateTimeFormatter = new Intl.DateTimeFormat('en-US', {
@@ -9,7 +9,7 @@ const dateTimeFormatter = new Intl.DateTimeFormat('en-US', {
 	month: 'short',
 	day: 'numeric',
 	hour: 'numeric',
-	minute: '2-digit',
+	minute: '2-digit'
 });
 
 const relativeFormatter = new Intl.RelativeTimeFormat('en-US', { numeric: 'auto' });

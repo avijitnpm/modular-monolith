@@ -8,5 +8,5 @@ export const usersApi = {
 		if (params?.limit) query.set('limit', String(params.limit));
 		const qs = query.toString();
 		return apiGet(`/users${qs ? `?${qs}` : ''}`, UserListSchema);
-	},
+	}
 };

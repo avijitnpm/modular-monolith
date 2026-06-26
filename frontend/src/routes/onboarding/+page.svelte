@@ -18,7 +18,7 @@
 		try {
 			await fetcher('/onboarding', {
 				method: 'POST',
-				body: { organization_name: orgName.trim() },
+				body: { organization_name: orgName.trim() }
 			});
 			window.location.href = '/dashboard';
 		} catch (err) {
@@ -35,7 +35,9 @@
 
 <div class="flex min-h-screen items-center justify-center">
 	<div class="w-full max-w-sm space-y-6 text-center">
-		<div class="bg-primary text-primary-foreground mx-auto flex size-12 items-center justify-center rounded-lg text-xl font-bold">
+		<div
+			class="bg-primary text-primary-foreground mx-auto flex size-12 items-center justify-center rounded-lg text-xl font-bold"
+		>
 			M
 		</div>
 		<div>
@@ -43,12 +45,7 @@
 			<p class="text-muted-foreground mt-1 text-sm">Set up your workspace to get started</p>
 		</div>
 		<form onsubmit={handleSubmit} class="space-y-4">
-			<Input
-				type="text"
-				placeholder="Organization name"
-				bind:value={orgName}
-				disabled={loading}
-			/>
+			<Input type="text" placeholder="Organization name" bind:value={orgName} disabled={loading} />
 			{#if error}
 				<p class="text-destructive text-sm">{error}</p>
 			{/if}

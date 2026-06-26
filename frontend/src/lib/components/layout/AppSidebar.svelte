@@ -9,24 +9,27 @@
 		SidebarHeader,
 		SidebarMenu,
 		SidebarMenuButton,
-		SidebarMenuItem,
+		SidebarMenuItem
 	} from '$lib/components/ui/sidebar/index.js';
 	import { LayoutDashboard, CreditCard, Users, Shield, Settings } from '@lucide/svelte';
 	import { page } from '$app/state';
+	import { resolve } from '$app/paths';
 
 	const navItems = [
 		{ title: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
 		{ title: 'Billing', href: '/billing', icon: CreditCard },
 		{ title: 'Users', href: '/users', icon: Users },
 		{ title: 'Roles', href: '/roles', icon: Shield },
-		{ title: 'Settings', href: '/settings', icon: Settings },
-	];
+		{ title: 'Settings', href: '/settings', icon: Settings }
+	] as const;
 </script>
 
 <Sidebar>
 	<SidebarHeader>
 		<div class="flex items-center gap-2 px-2 py-1">
-			<div class="bg-primary text-primary-foreground flex size-7 items-center justify-center rounded-md text-sm font-bold">
+			<div
+				class="bg-primary text-primary-foreground flex size-7 items-center justify-center rounded-md text-sm font-bold"
+			>
 				M
 			</div>
 			<span class="text-sm font-semibold">Platform</span>
@@ -37,11 +40,11 @@
 			<SidebarGroupLabel>Navigation</SidebarGroupLabel>
 			<SidebarGroupContent>
 				<SidebarMenu>
-					{#each navItems as item}
+					{#each navItems as item (item.href)}
 						<SidebarMenuItem>
 							<SidebarMenuButton isActive={page.url.pathname.startsWith(item.href)}>
 								{#snippet child({ props })}
-									<a href={item.href} {...props}>
+									<a href={resolve(item.href)} {...props}>
 										<item.icon />
 										<span>{item.title}</span>
 									</a>

@@ -1,12 +1,12 @@
 const usdFormatter = new Intl.NumberFormat('en-US', {
 	style: 'currency',
-	currency: 'USD',
+	currency: 'USD'
 });
 
 const usdCompactFormatter = new Intl.NumberFormat('en-US', {
 	style: 'currency',
 	currency: 'USD',
-	notation: 'compact',
+	notation: 'compact'
 });
 
 export function formatCurrency(cents: number): string {

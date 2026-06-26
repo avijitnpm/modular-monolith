@@ -16,10 +16,10 @@ export async function fetcher<T>(path: string, options: RequestOptions = {}): Pr
 		method,
 		headers: {
 			'Content-Type': 'application/json',
-			...headers,
+			...headers
 		},
 		credentials: 'include',
-		signal,
+		signal
 	};
 
 	if (body !== undefined) {
@@ -58,13 +58,13 @@ async function parseErrorResponse(res: Response): Promise<ApiError> {
 			status: res.status,
 			code: data.code ?? 'ERROR',
 			message: data.error ?? data.message ?? res.statusText,
-			details: data.validation_errors,
+			details: data.validation_errors
 		};
 	} catch {
 		return {
 			status: res.status,
 			code: 'ERROR',
-			message: res.statusText,
+			message: res.statusText
 		};
 	}
 }

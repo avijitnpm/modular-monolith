@@ -10,7 +10,7 @@
 </script>
 
 <div class="grid gap-4 md:grid-cols-2">
-	{#each roles as role}
+	{#each roles as role (role.id)}
 		<RoleCard {role} />
 	{/each}
 </div>

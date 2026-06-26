@@ -6,12 +6,12 @@ export const UserListItemSchema = z.object({
 	name: z.string(),
 	role: z.string(),
 	status: z.string(),
-	createdAt: z.string(),
+	createdAt: z.string()
 });
 
 export const UserListSchema = z.object({
 	users: z.array(UserListItemSchema),
-	total: z.number(),
+	total: z.number()
 });
 
 export type UserListItem = z.infer<typeof UserListItemSchema>;

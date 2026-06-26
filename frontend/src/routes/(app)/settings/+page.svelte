@@ -15,7 +15,10 @@
 	<ErrorState message="Unable to load profile information." />
 {:else}
 	<div class="space-y-6">
-		<PageHeader title="Settings" description="Manage your account preferences and session information." />
+		<PageHeader
+			title="Settings"
+			description="Manage your account preferences and session information."
+		/>
 		<div class="grid gap-6 md:grid-cols-2">
 			<div class="space-y-6">
 				<ProfileCard user={auth.user} />

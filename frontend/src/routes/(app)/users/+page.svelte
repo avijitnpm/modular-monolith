@@ -60,7 +60,7 @@
 		{:else}
 			<UserTable {users} />
 			<div class="space-y-3 md:hidden">
-				{#each users as user}
+				{#each users as user (user.id)}
 					<UserCard {user} />
 				{/each}
 			</div>

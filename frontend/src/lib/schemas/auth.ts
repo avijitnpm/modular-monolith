@@ -11,12 +11,12 @@ export const UserSchema = z.object({
 	family_name: z.string().optional(),
 	locale: z.string().optional(),
 	organization_id: z.string().optional(),
-	roles: z.array(z.string()).optional(),
+	roles: z.array(z.string()).optional()
 });
 
 export const AuthMeResponseSchema = z.object({
 	authenticated: z.boolean(),
-	user: UserSchema,
+	user: UserSchema
 });
 
 export type User = z.infer<typeof UserSchema>;

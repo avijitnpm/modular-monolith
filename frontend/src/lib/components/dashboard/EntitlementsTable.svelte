@@ -32,7 +32,7 @@
 				</tr>
 			</thead>
 			<tbody>
-				{#each entitlements as ent}
+				{#each entitlements as ent (ent.metric)}
 					<tr class="border-t">
 						<td class="px-4 py-2 capitalize">{ent.metric.replace(/_/g, ' ')}</td>
 						<td class="px-4 py-2">{ent.used.toLocaleString()}</td>

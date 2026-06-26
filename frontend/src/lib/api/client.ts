@@ -12,7 +12,11 @@ function unwrap(raw: unknown): unknown {
 	return raw;
 }
 
-export async function apiGet<T>(path: string, schema: ZodType<T>, signal?: AbortSignal): Promise<T> {
+export async function apiGet<T>(
+	path: string,
+	schema: ZodType<T>,
+	signal?: AbortSignal
+): Promise<T> {
 	const raw = await fetcher<unknown>(path, { signal });
 	return schema.parse(unwrap(raw));
 }
@@ -21,7 +25,7 @@ export async function apiPost<T>(
 	path: string,
 	body: unknown,
 	schema: ZodType<T>,
-	options?: Pick<RequestOptions, 'signal'>,
+	options?: Pick<RequestOptions, 'signal'>
 ): Promise<T> {
 	const raw = await fetcher<unknown>(path, { method: 'POST', body, ...options });
 	return schema.parse(unwrap(raw));
@@ -31,7 +35,7 @@ export async function apiPut<T>(
 	path: string,
 	body: unknown,
 	schema: ZodType<T>,
-	options?: Pick<RequestOptions, 'signal'>,
+	options?: Pick<RequestOptions, 'signal'>
 ): Promise<T> {
 	const raw = await fetcher<unknown>(path, { method: 'PUT', body, ...options });
 	return schema.parse(unwrap(raw));

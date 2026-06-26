@@ -5,7 +5,7 @@ import {
 	UsageMetricsSchema,
 	type EntitlementItem,
 	type Subscription,
-	type UsageMetrics,
+	type UsageMetrics
 } from '$lib/schemas/billing.js';
 
 export const billingApi = {
@@ -16,8 +16,6 @@ export const billingApi = {
 		return apiGet('/billing/usage', UsageMetricsSchema);
 	},
 	getEntitlements(): Promise<EntitlementItem[]> {
-		return apiGet('/billing/entitlements', EntitlementsResponseSchema).then(
-			(r) => r.entitlements,
-		);
-	},
+		return apiGet('/billing/entitlements', EntitlementsResponseSchema).then((r) => r.entitlements);
+	}
 };

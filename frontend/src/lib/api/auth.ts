@@ -8,5 +8,5 @@ export const authApi = {
 	},
 	logout(): Promise<void> {
 		return fetcher('/auth/logout', { method: 'POST' });
-	},
+	}
 };

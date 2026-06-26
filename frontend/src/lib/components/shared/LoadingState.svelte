@@ -9,7 +9,7 @@
 </script>
 
 <div class="space-y-3">
-	{#each Array(lines) as _}
+	{#each Array.from({ length: lines }).keys() as i (i)}
 		<Skeleton class="h-4 w-full" />
 	{/each}
 </div>

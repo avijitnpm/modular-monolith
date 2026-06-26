@@ -2,6 +2,7 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { session } from '$lib/stores/session.svelte.js';
 	import { formatDateTime } from '$lib/utils/date.js';
+	import { resolve } from '$app/paths';
 
 	interface Props {
 		authenticated: boolean;
@@ -27,7 +28,7 @@
 		</div>
 	</div>
 	<div class="mt-4">
-		<a href="/logout">
+		<a href={resolve('/logout')}>
 			<Button variant="outline" size="sm">Logout</Button>
 		</a>
 	</div>

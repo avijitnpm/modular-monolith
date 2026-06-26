@@ -3,13 +3,14 @@
 	import { env } from '$lib/config/env.js';
 	import { auth } from '$lib/stores/auth.svelte.js';
 	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import { LogIn } from '@lucide/svelte';
 
 	let loading = $state(false);
 
 	$effect(() => {
 		if (auth.isAuthenticated) {
-			goto('/dashboard');
+			goto(resolve('/dashboard'));
 		}
 	});
 
@@ -21,7 +22,9 @@
 
 <div class="flex min-h-screen items-center justify-center">
 	<div class="w-full max-w-sm space-y-6 text-center">
-		<div class="bg-primary text-primary-foreground mx-auto flex size-12 items-center justify-center rounded-lg text-xl font-bold">
+		<div
+			class="bg-primary text-primary-foreground mx-auto flex size-12 items-center justify-center rounded-lg text-xl font-bold"
+		>
 			M
 		</div>
 		<div>

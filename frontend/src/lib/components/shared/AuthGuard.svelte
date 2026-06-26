@@ -2,6 +2,7 @@
 	import type { Snippet } from 'svelte';
 	import { auth } from '$lib/stores/auth.svelte.js';
 	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import AuthLoading from '$lib/components/shared/AuthLoading.svelte';
 
 	interface Props {
@@ -12,7 +13,7 @@
 
 	$effect(() => {
 		if (!auth.loading && !auth.isAuthenticated) {
-			goto('/login');
+			goto(resolve('/login'));
 		}
 	});
 </script>

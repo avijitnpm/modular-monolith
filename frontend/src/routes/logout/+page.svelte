@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import { auth } from '$lib/stores/auth.svelte.js';
 	import { authApi } from '$lib/api/auth.js';
 
@@ -11,7 +12,7 @@
 			// Ignore logout API errors
 		}
 		auth.logout();
-		goto('/login');
+		goto(resolve('/login'));
 	});
 </script>
 

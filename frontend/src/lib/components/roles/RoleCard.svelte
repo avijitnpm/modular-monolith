@@ -23,7 +23,7 @@
 	</button>
 	{#if expanded}
 		<ul class="mt-2 space-y-1">
-			{#each role.permissions as perm}
+			{#each role.permissions as perm (perm.name)}
 				<li class="text-muted-foreground text-sm font-mono">{perm.name}</li>
 			{/each}
 		</ul>

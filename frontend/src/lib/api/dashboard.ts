@@ -4,5 +4,5 @@ import { DashboardResponseSchema, type DashboardResponse } from '$lib/schemas/da
 export const dashboardApi = {
 	get(): Promise<DashboardResponse> {
 		return apiGet('/organizations/dashboard', DashboardResponseSchema);
-	},
+	}
 };
