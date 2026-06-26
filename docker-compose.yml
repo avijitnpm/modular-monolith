@@ -30,7 +30,7 @@ services:
       postgres:
         condition: service_healthy
       openobserve:
-        condition: service_healthy
+        condition: service_started
     networks:
       - monolith_internal
     healthcheck:
@@ -134,12 +134,9 @@ services:
       - openobserve_data:/data
     networks:
       - monolith_internal
-    healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:5080/healthz || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 30s
+    # No healthcheck: openobserve/openobserve is a distroless image without
+    # /bin/sh, wget, or curl. CMD-SHELL cannot execute. The app's OTEL exporter
+    # is asynchronous and handles unavailability gracefully.
     deploy:
       resources:
         limits:
