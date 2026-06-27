@@ -22,6 +22,14 @@ func ResolveMembershipMiddleware(
 				m, err := resolver.ResolveMembership(ctx, id.IdentityID)
 				if err == nil && m != nil {
 					ctx = appcontext.SetMembership(ctx, m)
+
+					// Legacy compatibility: set AuthenticatedUser for modules
+					// that still read it (e.g. rbac handler).
+					ctx = appcontext.SetAuthenticatedUser(ctx, &appcontext.AuthenticatedUser{
+						UserID:         m.MembershipID,
+						OrganizationID: m.OrganizationID,
+						Email:          id.Email,
+					})
 				}
 			}
 

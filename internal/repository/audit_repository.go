@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"encoding/json"
+	"time"
 )
 
 func (r *Repository) CreateAuditLog(
@@ -96,6 +97,7 @@ func (r *Repository) ListAuditLogs(
 	for rows.Next() {
 		var log AuditLog
 		var metadataJSON []byte
+		var createdAt time.Time
 
 		err := rows.Scan(
 			&log.ID,
@@ -104,12 +106,14 @@ func (r *Repository) ListAuditLogs(
 			&log.EntityID,
 			&log.UserID,
 			&metadataJSON,
-			&log.CreatedAt,
+			&createdAt,
 		)
 
 		if err != nil {
 			return nil, err
 		}
+
+		log.CreatedAt = createdAt.Format(time.RFC3339)
 
 		if metadataJSON != nil {
 			_ = json.Unmarshal(metadataJSON, &log.Metadata)
