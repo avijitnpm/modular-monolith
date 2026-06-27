@@ -1,4 +1,4 @@
-.PHONY: dev build test fmt lint frontend frontend-build docker-build docker-up docker-down migrate migration setup
+.PHONY: dev build test fmt lint frontend frontend-build docker-build docker-up docker-down migrate migration setup benchmark-smoke benchmark-load benchmark-stress benchmark-soak
 
 dev:
 	go run ./cmd/server
@@ -41,3 +41,15 @@ migration:
 setup:
 	cp -n .env.example .env 2>/dev/null || true
 	cd frontend && pnpm install --frozen-lockfile
+
+benchmark-smoke:
+	k6 run benchmark/smoke.js
+
+benchmark-load:
+	k6 run benchmark/load.js
+
+benchmark-stress:
+	k6 run benchmark/stress.js
+
+benchmark-soak:
+	k6 run benchmark/soak.js

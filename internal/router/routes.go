@@ -173,7 +173,7 @@ func registerRoutes(
 		w.Write([]byte("ok"))
 	})
 
-	healthHandler := health.NewHandler(service.Repository.DB)
+	healthHandler := health.NewHandler(service.Repository.DB, health.WithLogger(logger))
 	r.Get("/health/live", healthHandler.Live)
 	r.Get("/health/ready", healthHandler.Ready)
 
